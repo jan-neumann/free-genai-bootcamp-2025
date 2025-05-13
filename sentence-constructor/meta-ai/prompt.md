@@ -16,9 +16,6 @@ Beginner, JLPT5
 - The table of the vocabulary should only have the following columns: Japanese, Romaji, English
 - Do not use romaji when showing japanese except in the table of the vocabulary
 
-## Student Input: 
-Bears are at the door, did you leave the garbage out?
-
 ## Examples
 
 Here are examples of user input and assistant output, pay attention to the score
@@ -108,3 +105,6 @@ Possible next steps:
 - GOOD: Clues don't give away any of the tense of conjugations
 </score_reasons>
 </example>
+
+## Student Input: 
+Did you see the raven this morning? They were looking at our garden.
