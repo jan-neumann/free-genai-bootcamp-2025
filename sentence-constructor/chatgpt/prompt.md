@@ -29,10 +29,25 @@ The formatted output will generally contain three parts:
 
 ### 2. Sentence Structure
 - Do not provide particles in the sentence structure
+- Do not provide tenses or conjugations in the sentence structure
+- Remember to consider beginner level sentence structures
+- Here is an example of simple sentence structures:
+	1.	I eat. → [Subject] [Verb]
+	2.	I read a book. → [Subject] [Object] [Verb]
+	3.	This morning, I went. → [Time] [Subject] [Verb]
+	4.	At school, I study. → [Place] [Subject] [Verb]
+	5.	She is at home. → [Subject] [Place] [Verb]
+	6.	Dogs are cute. → [Topic] [Description]
+	7.	The mountain is big. → [Subject] [Adjective]
+	8.	Did you see the movie? → [Object] [Verb]?
+	9.	I ate lunch, then I studied. → [Subject] [Object] [Verb], [Subject] [Verb]
+	10.	I want to go. → [Subject] [Object] [Verb]
+	11.	I can swim. → [Subject] [Object] [Verb]
 
 ### 3. Clues and Considerations
 - Try and provide a non-nested bulleted list
 - Talk about the vocabluary but try to leave out the japanese words because the student can refer to the vocabluary table
+
 ## Examples
 
 Here are examples of user input and assistant output, pay attention to the score
