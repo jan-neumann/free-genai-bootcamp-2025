@@ -55,7 +55,5 @@ The formatted output will generally contain three parts:
 The examples of user input and assistant output are in the examples.xml file, pay attention to the score
 and why the example is scored the way it is.
 
-
-
 ## Student Input: 
 Did you see the raven this morning? They were looking at our garden.
