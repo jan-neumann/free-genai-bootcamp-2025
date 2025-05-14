@@ -1,0 +1,46 @@
+<sentence-structure-examples>
+    <example>
+        <sentence>I eat.</sentence>
+        <structure>[Subject] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>I read a book.</sentence>
+        <structure>[Subject] [Object] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>This morning, I went.</sentence>
+        <structure>[Time] [Subject] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>At school, I study.</sentence>
+        <structure>[Place] [Subject] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>She is at home.</sentence>
+        <structure>[Subject] [Place] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>Dogs are cute.</sentence>
+        <structure>[Topic] [Description].</structure>
+    </example>
+    <example>
+        <sentence>The mountain is big.</sentence>
+        <structure>[[Subject] [Adjective].</structure>
+    </example>
+    <example>
+        <sentence>Did you see the movie?</sentence>
+        <structure>[Object] [Verb]?</structure>
+    </example>
+    <example>
+        <sentence>I ate lunch, then I studied.</sentence>
+        <structure>[Subject] [Object] [Verb], [Subject] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>I want to go.</sentence>
+        <structure>[Subject] [Object] [Verb].</structure>
+    </example>
+    <example>
+        <sentence>I can swim.</sentence>
+        <structure>[Subject] [Object] [Verb].</structure>
+    </example>
+</sentence-structure-examples>
