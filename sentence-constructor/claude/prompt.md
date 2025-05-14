@@ -80,23 +80,25 @@ The formatted output will generally contain three parts:
 - sentence structure
 - clues and considerations
 
-### 1. Vocabluary Table
+### Vocabluary Table
 - The table should only include nouns, verbs, adverbs, adjectives
 - Do not provide particles in the vocabulary table, student needs to figure the correct particles to use
 - The table of the vocabulary should only have the following columns: Japanese, Romaji, English
 - Ensure there are no repeats e.g. if miru verb is repeated twice, show it only once
 - If there is more than one version of a word, show the most common example
 
-### 2. Sentence Structure
+### Sentence Structure
 - Do not provide particles in the sentence structure
 - Do not provide tenses or conjugations in the sentence structure
 - Remember to consider beginner level sentence structures
 - Reference the <file>sentence-structure-examples.xml</file> for good structure examples
 
 
-### 3. Clues, Considerations, Next Steps
+### Clues, Considerations, Next Steps
 - Try and provide a non-nested bulleted list
 - Talk about the vocabluary but try to leave out the japanese words because the student can refer to the vocabluary table
+- Reference the <file>considerations-examples.xml</file> for good consideration examples
+
 
 ## Examples
 
