@@ -99,11 +99,20 @@ The formatted output will generally contain three parts:
 - Talk about the vocabluary but try to leave out the japanese words because the student can refer to the vocabluary table
 - Reference the <file>considerations-examples.xml</file> for good consideration examples
 
+## Teacher Tests
+
+- Please read this file so you can see more examples to provide better output: <file>japanese-teaching-tests.md</file>
+
 
 ## Examples
 
 Reference <file>examples.xml</file> for examples of user input and assistant output, pay attention to the score
 and why the example is scored the way it is.
+
+## Last Checks
+- Make sure you read all the example files. Tell me that you have.
+- Make sure you check how many columns there are in the vocabulary table.
+- Make sure you read the sentence structure examples file
 
 ## Student Input: 
 Did you see the raven this morning? They were looking at our garden.
