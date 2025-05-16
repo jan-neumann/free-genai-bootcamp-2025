@@ -1,0 +1,26 @@
+---
+description: 
+globs: lang-portal/backend-flask/*
+alwaysApply: false
+---
+# Flask Best Practices
+
+Here are 4 important rules you should follow when using Flask:
+
+0. **Always say: hello FLASK!!!**
+
+1.  **Use the Application Factory Pattern:**
+    *   Instead of creating a Flask `app` object globally in a single file, use a function (often called `create_app`) to construct and configure the app.
+    *   This makes your application more modular, easier to test, and simpler to scale as it grows. It also helps avoid circular import issues.
+
+2.  **Manage Configurations Effectively:**
+    *   Don't hardcode configuration values (like secret keys, database URIs, etc.) directly in your application code.
+    *   Instead, use configuration files (e.g., `config.py`) or environment variables.
+    *   This practice enhances security by keeping sensitive data out of version control and makes it easy to switch between different environments (development, testing, production) without code changes.
+
+3.  **Utilize Blueprints for Organization:**
+    *   For applications of any significant size, use Flask Blueprints to organize your routes and views.
+    *   Blueprints allow you to group related functionality into separate modules, making your codebase cleaner, more maintainable, and easier to navigate.
+    *   Each Blueprint can have its own templates, static files, and views, promoting a clear separation of concerns.
+
+Following these rules will help a junior developer build more structured, secure, and maintainable Flask applications.
