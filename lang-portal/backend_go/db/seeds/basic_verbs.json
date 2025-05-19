@@ -1,0 +1,32 @@
+[
+  {
+    "japanese": "食べる",
+    "romaji": "taberu",
+    "english": "to eat",
+    "parts": ["verb", "ichidan"]
+  },
+  {
+    "japanese": "飲む",
+    "romaji": "nomu",
+    "english": "to drink",
+    "parts": ["verb", "godan"]
+  },
+  {
+    "japanese": "行く",
+    "romaji": "iku",
+    "english": "to go",
+    "parts": ["verb", "godan"]
+  },
+  {
+    "japanese": "来る",
+    "romaji": "kuru",
+    "english": "to come",
+    "parts": ["verb", "irregular"]
+  },
+  {
+    "japanese": "する",
+    "romaji": "suru",
+    "english": "to do",
+    "parts": ["verb", "irregular"]
+  }
+] 

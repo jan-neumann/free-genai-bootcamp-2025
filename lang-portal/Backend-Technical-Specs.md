@@ -8,6 +8,7 @@ A language learning school wants to build a prototype of learning portal which w
 You have been tasked with creating the backend API of the application.
 
 ## Technical Requirements
+
 - The backend will be built using Go
 - The database will be SQLite3
 - The API will be built using Gin
@@ -19,6 +20,53 @@ You have been tasked with creating the backend API of the application.
 
 Our database will be a single sqlite3 database called `words.db` 
 that will be in the root og the project folder of `backend_go`.
+
+## Directory Structure
+
+```text 
+backend_go/
+├── words.db            # SQLite database file
+├── cmd/
+│   └── server/         # Main application entry
+├── internal/
+│   ├── api/            # API handlers
+│   │   ├── handlers/   # Individual endpoint handlers
+│   │   │   ├── dashboard.go # Dashboard endpoints
+│   │   │   ├── groups.go    # Group endpoints
+│   │   │   ├── settings.go  # Settings endpoints
+│   │   │   ├── study.go     # Study activity/session endpoints
+│   │   │   └── words.go     # Word endpoints
+│   │   ├── middleware/   # HTTP middleware
+│   │   │   └── pagination.go
+│   │   └── router.go      # Gin router setup
+│   │
+│   ├── models/         # Database models/entities
+│   │   ├── word.go
+│   │   ├── group.go
+│   │   ├── study.go
+│   │   └── review.go
+│   │
+│   ├── repository/     # Database operations
+│   │   ├── word.go
+│   │   ├── group.go
+│   │   ├── study.go
+│   │   └── review.go
+│   │
+│   └── service/        # Business logic layer
+│       ├── dashboard.go
+│       ├── group.go
+│       ├── study.go
+│       └── word.go
+├── db/                 # Database related files
+│   ├── migrations/     # SQL migration files
+│   │   ├── 00001_init.sql
+│   │   └── 00002_create_words_table.sql
+│   └── seeds/         # JSON seed data
+│       └── basic_verbs.json
+├── magefile.go         # Task runner
+├── go.mod
+└── go.sum
+```
 
 We have the following tables:
 
@@ -507,7 +555,7 @@ Performs a complete reset of the application.
   "message": "Application has been fully reset"
 }
 ```
-## Mage Tasks
+## Task Runner Tasks
 
 Mage is a task runner for Go. 
 Lets list out possible tasks we need for our lang portal.
@@ -532,7 +580,6 @@ in the root of the project folder of `backend_go`.
 ### Seed Database
 
 This task will import json files and transform them into target data for our database.
-
 
 
 - All seed files live in the `seeds` folder.
