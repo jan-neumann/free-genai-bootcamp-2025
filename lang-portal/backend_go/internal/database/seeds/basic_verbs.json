@@ -1,0 +1,44 @@
+[
+  {
+    "japanese": "食べる",
+    "romaji": "taberu",
+    "english": "to eat",
+    "parts": ["verb", "basic"]
+  },
+  {
+    "japanese": "飲む",
+    "romaji": "nomu",
+    "english": "to drink",
+    "parts": ["verb", "basic"]
+  },
+  {
+    "japanese": "行く",
+    "romaji": "iku",
+    "english": "to go",
+    "parts": ["verb", "basic", "movement"]
+  },
+  {
+    "japanese": "来る",
+    "romaji": "kuru",
+    "english": "to come",
+    "parts": ["verb", "basic", "movement"]
+  },
+  {
+    "japanese": "見る",
+    "romaji": "miru",
+    "english": "to see, to look",
+    "parts": ["verb", "basic"]
+  },
+  {
+    "japanese": "聞く",
+    "romaji": "kiku",
+    "english": "to listen, to hear",
+    "parts": ["verb", "basic"]
+  },
+  {
+    "japanese": "話す",
+    "romaji": "hanasu",
+    "english": "to speak, to talk",
+    "parts": ["verb", "basic", "communication"]
+  }
+] 

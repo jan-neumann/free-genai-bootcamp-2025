@@ -1,4 +1,4 @@
-module github.com/free-genai-bootcamp-2025/lang-portal/backend_go
+module lang-portal/backend_go
 
 go 1.24.3
 
@@ -32,6 +32,7 @@ require (
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/sqlite v1.5.7 // indirect

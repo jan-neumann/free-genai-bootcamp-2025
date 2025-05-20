@@ -1,0 +1,32 @@
+[
+  {
+    "japanese": "こんにちは",
+    "romaji": "konnichiwa",
+    "english": "hello (good afternoon)",
+    "parts": ["greeting"]
+  },
+  {
+    "japanese": "おはようございます",
+    "romaji": "ohayou gozaimasu",
+    "english": "good morning",
+    "parts": ["greeting"]
+  },
+  {
+    "japanese": "こんばんは",
+    "romaji": "konbanwa",
+    "english": "good evening",
+    "parts": ["greeting"]
+  },
+  {
+    "japanese": "さようなら",
+    "romaji": "sayounara",
+    "english": "goodbye",
+    "parts": ["greeting", "farewell"]
+  },
+  {
+    "japanese": "ありがとう",
+    "romaji": "arigatou",
+    "english": "thank you",
+    "parts": ["greeting", "gratitude"]
+  }
+] 
