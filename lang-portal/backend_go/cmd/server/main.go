@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultPort = "8080"
+	defaultPort = "8081"
 	dbPath      = "words.db"
 )
 

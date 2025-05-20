@@ -68,9 +68,12 @@ func (r *StudyRepository) ListStudyActivities(params PaginationParams) (*Paginat
 
 // CreateStudySession creates a new study session
 func (r *StudyRepository) CreateStudySession(session *models.StudySession) error {
-	if err := session.Validate(); err != nil {
-		return ErrInvalidInput
-	}
+	// Validation of GroupID and StudyActivityID existence is handled by the service layer.
+	// Model-level validation (session.Validate()) is too strict here as it would
+	// require fully populated Group and Activity sub-structs, which are not part of the input payload.
+	// if err := session.Validate(); err != nil { // Removed this validation
+	// 	return ErrInvalidInput
+	// }
 	return r.db.Create(session).Error
 }
 

@@ -89,16 +89,25 @@ func GetWord(s *service.WordService) gin.HandlerFunc {
 
 func ListWords(s *service.WordService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		params := middleware.GetPaginationParams(c)
-		words, err := s.ListWords(service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.ListWords(serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, words)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -158,16 +167,25 @@ func GetWordsByGroup(s *service.WordService) gin.HandlerFunc {
 			return
 		}
 
-		params := middleware.GetPaginationParams(c)
-		words, err := s.GetWordsByGroup(uint(groupID), service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.GetWordsByGroup(uint(groupID), serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, words)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -218,16 +236,25 @@ func GetGroup(s *service.GroupService) gin.HandlerFunc {
 
 func ListGroups(s *service.GroupService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		params := middleware.GetPaginationParams(c)
-		groups, err := s.ListGroups(service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.ListGroups(serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, groups)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -372,16 +399,25 @@ func GetGroupsByWord(s *service.GroupService) gin.HandlerFunc {
 			return
 		}
 
-		params := middleware.GetPaginationParams(c)
-		groups, err := s.GetGroupsByWord(uint(wordID), service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.GetGroupsByWord(uint(wordID), serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, groups)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -428,16 +464,25 @@ func GetStudyActivity(s *service.StudyService) gin.HandlerFunc {
 
 func ListStudyActivities(s *service.StudyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		params := middleware.GetPaginationParams(c)
-		activities, err := s.ListStudyActivities(service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.ListStudyActivities(serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, activities)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -486,16 +531,26 @@ func GetStudySession(s *service.StudyService) gin.HandlerFunc {
 
 func ListStudySessions(s *service.StudyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		params := middleware.GetPaginationParams(c)
-		sessions, err := s.ListStudySessions(service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.ListStudySessions(serviceParams)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list study sessions: " + err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, sessions)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -507,16 +562,25 @@ func GetStudySessionsByGroup(s *service.StudyService) gin.HandlerFunc {
 			return
 		}
 
-		params := middleware.GetPaginationParams(c)
-		sessions, err := s.GetStudySessionsByGroup(uint(groupID), service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.GetStudySessionsByGroup(uint(groupID), serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, sessions)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -528,16 +592,25 @@ func GetStudySessionsByActivity(s *service.StudyService) gin.HandlerFunc {
 			return
 		}
 
-		params := middleware.GetPaginationParams(c)
-		sessions, err := s.GetStudySessionsByActivity(uint(activityID), service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.GetStudySessionsByActivity(uint(activityID), serviceParams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, sessions)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -576,20 +649,29 @@ func GetWordReviewsBySession(s *service.StudyService) gin.HandlerFunc {
 			return
 		}
 
-		params := middleware.GetPaginationParams(c)
-		reviews, err := s.GetWordReviewsBySession(uint(sessionID), service.PaginationParams{
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		})
+		ginParams := middleware.GetPaginationParams(c)
+		serviceParams := service.PaginationParams{
+			Page:     ginParams.Page,
+			PageSize: ginParams.PageSize,
+		}
+
+		servicePaginatedResult, err := s.GetWordReviewsBySession(uint(sessionID), serviceParams)
 		if err != nil {
-			if err.(*service.ServiceError).Code == service.ErrCodeNotFound {
+			if serr, ok := err.(*service.ServiceError); ok && serr.Code == service.ErrCodeNotFound {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Study session not found"})
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, reviews)
+
+		interfaceItems := make([]interface{}, len(servicePaginatedResult.Items))
+		for i, item := range servicePaginatedResult.Items {
+			interfaceItems[i] = item
+		}
+
+		response := middleware.NewPaginatedResponse(interfaceItems, int(servicePaginatedResult.TotalItems), ginParams)
+		c.JSON(http.StatusOK, response)
 	}
 }
 

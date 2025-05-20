@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -9,16 +10,21 @@ import (
 
 	"lang-portal/backend_go/internal/api/middleware"
 	"lang-portal/backend_go/internal/models"
+	"lang-portal/backend_go/internal/service"
 )
 
 // StudyHandler handles study-related requests
 type StudyHandler struct {
-	db *gorm.DB
+	studyService *service.StudyService
+	db           *gorm.DB
 }
 
 // NewStudyHandler creates a new study handler
-func NewStudyHandler(db *gorm.DB) *StudyHandler {
-	return &StudyHandler{db: db}
+func NewStudyHandler(studyService *service.StudyService, db *gorm.DB) *StudyHandler {
+	return &StudyHandler{
+		studyService: studyService,
+		db:           db,
+	}
 }
 
 // GetStudyActivities returns all study activities
@@ -87,33 +93,37 @@ func (h *StudyHandler) GetStudyActivity(c *gin.Context) {
 	})
 }
 
-// CreateStudySession creates a new study session
-func (h *StudyHandler) CreateStudySession(c *gin.Context) {
-	var session models.StudySession
-	if err := c.ShouldBindJSON(&session); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
-		return
-	}
+// CreateStudySession returns a gin.HandlerFunc to create a new study session.
+// This is the function called by api/services.go.
+func CreateStudySession(studyService *service.StudyService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var sessionInput models.StudySession
+		if err := c.ShouldBindJSON(&sessionInput); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+			return
+		}
 
-	// Verify that the group and activity exist
-	var group models.Group
-	if err := h.db.First(&group, session.GroupID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Group not found"})
-		return
-	}
+		if err := studyService.CreateStudySession(&sessionInput); err != nil {
+			var srvErr *service.ServiceError
+			if errors.As(err, &srvErr) {
+				detailedErrorMessage := srvErr.Error() // Get the full combined message
+				switch srvErr.Code {
+				case service.ErrCodeNotFound:
+					c.JSON(http.StatusNotFound, gin.H{"error": detailedErrorMessage})
+				case service.ErrCodeInvalidInput:
+					c.JSON(http.StatusBadRequest, gin.H{"error": detailedErrorMessage})
+				default: // service.ErrCodeInternal or other unhandled service codes
+					c.JSON(http.StatusInternalServerError, gin.H{"error": detailedErrorMessage})
+				}
+			} else {
+				// This case should ideally not be reached if studyService always returns *ServiceError
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create study session: unexpected error type"})
+			}
+			return
+		}
 
-	var activity models.StudyActivity
-	if err := h.db.First(&activity, session.StudyActivityID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Study activity not found"})
-		return
+		c.JSON(http.StatusCreated, sessionInput)
 	}
-
-	if err := h.db.Create(&session).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create study session"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, session)
 }
 
 // GetStudySessions returns all study sessions
@@ -179,40 +189,31 @@ func (h *StudyHandler) GetStudySession(c *gin.Context) {
 		return
 	}
 
-	var session models.StudySession
-	if err := h.db.Preload("Activity").
-		Preload("Group").
-		Preload("Reviews").
-		First(&session, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Study session not found"})
-			return
+	// Call the service to get the study session
+	session, err := h.studyService.GetStudySession(uint(id))
+	if err != nil {
+		// Handle potential service errors (e.g., ErrCodeNotFound)
+		var srvErr *service.ServiceError
+		if errors.As(err, &srvErr) {
+			detailedErrorMessage := srvErr.Error()
+			switch srvErr.Code {
+			case service.ErrCodeNotFound:
+				c.JSON(http.StatusNotFound, gin.H{"error": detailedErrorMessage})
+			case service.ErrCodeInvalidInput:
+				c.JSON(http.StatusBadRequest, gin.H{"error": detailedErrorMessage})
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": detailedErrorMessage})
+			}
+		} else {
+			// Fallback for unexpected error types from the service
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch study session: " + err.Error()})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch study session"})
 		return
 	}
 
-	// Calculate success rate
-	var correctCount int
-	for _, review := range session.Reviews {
-		if review.Correct {
-			correctCount++
-		}
-	}
-	successRate := 0
-	if len(session.Reviews) > 0 {
-		successRate = (correctCount * 100) / len(session.Reviews)
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"id":                 session.ID,
-		"activity_name":      session.Activity.Name,
-		"group_name":         session.Group.Name,
-		"start_time":         session.CreatedAt,
-		"end_time":           session.CreatedAt, // Using CreatedAt as end_time for now
-		"review_items_count": len(session.Reviews),
-		"success_rate":       successRate,
-	})
+	// The service now returns *models.StudySession with preloaded Group and Activity.
+	// The JSON tags in models.StudySession will handle the serialization.
+	c.JSON(http.StatusOK, session)
 }
 
 // AddWordReview adds a word review to a study session

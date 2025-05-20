@@ -5,11 +5,12 @@ import (
 	"gorm.io/gorm"
 
 	"lang-portal/backend_go/internal/api/handlers"
+	"lang-portal/backend_go/internal/service"
 )
 
 // RegisterStudyRoutes registers all study-related routes
-func RegisterStudyRoutes(router *gin.Engine, db *gorm.DB) {
-	studyHandler := handlers.NewStudyHandler(db)
+func RegisterStudyRoutes(router *gin.Engine, db *gorm.DB, studyService *service.StudyService) {
+	studyHandler := handlers.NewStudyHandler(studyService, db)
 
 	// Study activities routes
 	activities := router.Group("/api/study/activities")
@@ -21,7 +22,7 @@ func RegisterStudyRoutes(router *gin.Engine, db *gorm.DB) {
 	// Study sessions routes
 	sessions := router.Group("/api/study/sessions")
 	{
-		sessions.POST("", studyHandler.CreateStudySession)
+		sessions.POST("", handlers.CreateStudySession(studyService))
 		sessions.GET("/:id", studyHandler.GetStudySession)
 		sessions.POST("/:id/reviews", studyHandler.AddWordReview)
 	}

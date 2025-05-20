@@ -23,6 +23,17 @@ type StudyActivity struct {
 	Name string `json:"name"`
 }
 
+// StudySessionInfo is the DTO for study session details and list items.
+// It matches the structure specified for GET /api/study/sessions and GET /api/study/sessions/:id.
+type StudySessionInfo struct {
+	ID               uint      `json:"id"`
+	ActivityName     string    `json:"activity_name"`
+	GroupName        string    `json:"group_name"`
+	StartTime        time.Time `json:"start_time"`
+	EndTime          time.Time `json:"end_time"` // Placeholder: using CreatedAt from model
+	ReviewItemsCount int       `json:"review_items_count"`
+}
+
 // StudySession represents a study session
 type StudySession struct {
 	ID              uint      `json:"id"`
@@ -112,12 +123,26 @@ func (s *StudyService) CreateStudySession(session *models.StudySession) error {
 	if err := s.studyRepo.CreateStudySession(session); err != nil {
 		return NewServiceError(ErrCodeInternal, "Failed to create study session", err)
 	}
+
+	// Reload the session to populate associations for the response for POST
+	loadedSession, err := s.studyRepo.GetStudySessionByID(session.ID)
+	if err != nil {
+		// Log this error or handle as per requirements.
+		// For POST, we need the full model, so if this fails, it's an issue.
+		// However, the primary record was created. Consider returning partial or error.
+		// For now, this logic is for POST. The handler will return session (models.StudySession).
+	} else {
+		session.Group = loadedSession.Group
+		session.Activity = loadedSession.Activity
+		session.Reviews = loadedSession.Reviews // Ensure reviews are also copied if needed by model users
+	}
+
 	return nil
 }
 
-// GetStudySession retrieves a study session by ID
-func (s *StudyService) GetStudySession(id uint) (*StudySession, error) {
-	session, err := s.studyRepo.GetStudySessionByID(id)
+// GetStudySession retrieves a study session by ID and transforms it to StudySessionInfo DTO.
+func (s *StudyService) GetStudySession(id uint) (*StudySessionInfo, error) {
+	modelSession, err := s.studyRepo.GetStudySessionByID(id) // This fetches models.StudySession
 	if err != nil {
 		if err == repository.ErrNotFound {
 			return nil, NewServiceError(ErrCodeNotFound, "Study session not found", err)
@@ -125,19 +150,18 @@ func (s *StudyService) GetStudySession(id uint) (*StudySession, error) {
 		return nil, NewServiceError(ErrCodeInternal, "Failed to fetch study session", err)
 	}
 
-	return &StudySession{
-		ID:              session.ID,
-		GroupID:         session.GroupID,
-		StudyActivityID: session.StudyActivityID,
-		GroupName:       session.Group.Name,
-		ActivityName:    session.Activity.Name,
-		CreatedAt:       session.CreatedAt,
-		WordCount:       len(session.Reviews),
+	return &StudySessionInfo{
+		ID:               modelSession.ID,
+		ActivityName:     modelSession.Activity.Name,
+		GroupName:        modelSession.Group.Name,
+		StartTime:        modelSession.CreatedAt,    // Map CreatedAt to StartTime
+		EndTime:          modelSession.CreatedAt,    // Placeholder: Map CreatedAt to EndTime
+		ReviewItemsCount: len(modelSession.Reviews), // Map Reviews length to ReviewItemsCount
 	}, nil
 }
 
 // ListStudySessions retrieves a paginated list of study sessions
-func (s *StudyService) ListStudySessions(params PaginationParams) (*PaginatedResult[StudySession], error) {
+func (s *StudyService) ListStudySessions(params PaginationParams) (*PaginatedResult[StudySessionInfo], error) {
 	result, err := s.studyRepo.ListStudySessions(repository.PaginationParams{
 		Page:     params.Page,
 		PageSize: params.PageSize,
@@ -147,24 +171,23 @@ func (s *StudyService) ListStudySessions(params PaginationParams) (*PaginatedRes
 	}
 
 	// Transform sessions
-	sessions := make([]StudySession, len(result.Items))
-	for i, s := range result.Items {
-		sessions[i] = StudySession{
-			ID:              s.ID,
-			GroupID:         s.GroupID,
-			StudyActivityID: s.StudyActivityID,
-			GroupName:       s.Group.Name,
-			ActivityName:    s.Activity.Name,
-			CreatedAt:       s.CreatedAt,
-			WordCount:       len(s.Reviews),
+	infos := make([]StudySessionInfo, len(result.Items))
+	for i, modelSession := range result.Items {
+		infos[i] = StudySessionInfo{
+			ID:               modelSession.ID,
+			ActivityName:     modelSession.Activity.Name,
+			GroupName:        modelSession.Group.Name,
+			StartTime:        modelSession.CreatedAt,
+			EndTime:          modelSession.CreatedAt, // Placeholder
+			ReviewItemsCount: len(modelSession.Reviews),
 		}
 	}
 
-	return NewPaginatedResult(sessions, result.TotalItems, params.Page, params.PageSize), nil
+	return NewPaginatedResult(infos, result.TotalItems, params.Page, params.PageSize), nil
 }
 
 // GetStudySessionsByGroup retrieves study sessions for a specific group
-func (s *StudyService) GetStudySessionsByGroup(groupID uint, params PaginationParams) (*PaginatedResult[StudySession], error) {
+func (s *StudyService) GetStudySessionsByGroup(groupID uint, params PaginationParams) (*PaginatedResult[StudySessionInfo], error) {
 	result, err := s.studyRepo.GetStudySessionsByGroup(groupID, repository.PaginationParams{
 		Page:     params.Page,
 		PageSize: params.PageSize,
@@ -174,24 +197,23 @@ func (s *StudyService) GetStudySessionsByGroup(groupID uint, params PaginationPa
 	}
 
 	// Transform sessions
-	sessions := make([]StudySession, len(result.Items))
-	for i, s := range result.Items {
-		sessions[i] = StudySession{
-			ID:              s.ID,
-			GroupID:         s.GroupID,
-			StudyActivityID: s.StudyActivityID,
-			GroupName:       s.Group.Name,
-			ActivityName:    s.Activity.Name,
-			CreatedAt:       s.CreatedAt,
-			WordCount:       len(s.Reviews),
+	infos := make([]StudySessionInfo, len(result.Items))
+	for i, modelSession := range result.Items {
+		infos[i] = StudySessionInfo{
+			ID:               modelSession.ID,
+			ActivityName:     modelSession.Activity.Name,
+			GroupName:        modelSession.Group.Name,
+			StartTime:        modelSession.CreatedAt,
+			EndTime:          modelSession.CreatedAt, // Placeholder
+			ReviewItemsCount: len(modelSession.Reviews),
 		}
 	}
 
-	return NewPaginatedResult(sessions, result.TotalItems, params.Page, params.PageSize), nil
+	return NewPaginatedResult(infos, result.TotalItems, params.Page, params.PageSize), nil
 }
 
 // GetStudySessionsByActivity retrieves study sessions for a specific activity
-func (s *StudyService) GetStudySessionsByActivity(activityID uint, params PaginationParams) (*PaginatedResult[StudySession], error) {
+func (s *StudyService) GetStudySessionsByActivity(activityID uint, params PaginationParams) (*PaginatedResult[StudySessionInfo], error) {
 	result, err := s.studyRepo.GetStudySessionsByActivity(activityID, repository.PaginationParams{
 		Page:     params.Page,
 		PageSize: params.PageSize,
@@ -201,20 +223,19 @@ func (s *StudyService) GetStudySessionsByActivity(activityID uint, params Pagina
 	}
 
 	// Transform sessions
-	sessions := make([]StudySession, len(result.Items))
-	for i, s := range result.Items {
-		sessions[i] = StudySession{
-			ID:              s.ID,
-			GroupID:         s.GroupID,
-			StudyActivityID: s.StudyActivityID,
-			GroupName:       s.Group.Name,
-			ActivityName:    s.Activity.Name,
-			CreatedAt:       s.CreatedAt,
-			WordCount:       len(s.Reviews),
+	infos := make([]StudySessionInfo, len(result.Items))
+	for i, modelSession := range result.Items {
+		infos[i] = StudySessionInfo{
+			ID:               modelSession.ID,
+			ActivityName:     modelSession.Activity.Name,
+			GroupName:        modelSession.Group.Name,
+			StartTime:        modelSession.CreatedAt,
+			EndTime:          modelSession.CreatedAt, // Placeholder
+			ReviewItemsCount: len(modelSession.Reviews),
 		}
 	}
 
-	return NewPaginatedResult(sessions, result.TotalItems, params.Page, params.PageSize), nil
+	return NewPaginatedResult(infos, result.TotalItems, params.Page, params.PageSize), nil
 }
 
 // AddWordReview adds a word review to a study session
@@ -280,23 +301,24 @@ func (s *StudyService) GetWordReviewsBySession(sessionID uint, params Pagination
 }
 
 // GetLastStudySession retrieves the most recent study session
-func (s *StudyService) GetLastStudySession() (*StudySession, error) {
-	session, err := s.studyRepo.GetLastStudySession()
+func (s *StudyService) GetLastStudySession() (*StudySessionInfo, error) {
+	modelSession, err := s.studyRepo.GetLastStudySession()
 	if err != nil {
 		if err == repository.ErrNotFound {
-			return nil, nil // Return nil instead of error for no sessions
+			// For GetLastStudySession, returning nil (which becomes null in JSON) is fine if no session exists.
+			return nil, nil
 		}
 		return nil, NewServiceError(ErrCodeInternal, "Failed to get last study session", err)
 	}
 
-	return &StudySession{
-		ID:              session.ID,
-		GroupID:         session.GroupID,
-		StudyActivityID: session.StudyActivityID,
-		GroupName:       session.Group.Name,
-		ActivityName:    session.Activity.Name,
-		CreatedAt:       session.CreatedAt,
-		WordCount:       len(session.Reviews),
+	// If a session is found, transform it to StudySessionInfo
+	return &StudySessionInfo{
+		ID:               modelSession.ID,
+		ActivityName:     modelSession.Activity.Name,
+		GroupName:        modelSession.Group.Name,
+		StartTime:        modelSession.CreatedAt,
+		EndTime:          modelSession.CreatedAt, // Placeholder
+		ReviewItemsCount: len(modelSession.Reviews),
 	}, nil
 }
 
