@@ -6,13 +6,13 @@ import (
 
 // BaseService provides common service functionality
 type BaseService struct {
-	wordRepo  *repository.WordRepository
-	groupRepo *repository.GroupRepository
-	studyRepo *repository.StudyRepository
+	wordRepo  repository.WordRepositoryInterface
+	groupRepo repository.GroupRepositoryInterface
+	studyRepo repository.StudyRepositoryInterface
 }
 
 // NewBaseService creates a new base service
-func NewBaseService(wordRepo *repository.WordRepository, groupRepo *repository.GroupRepository, studyRepo *repository.StudyRepository) *BaseService {
+func NewBaseService(wordRepo repository.WordRepositoryInterface, groupRepo repository.GroupRepositoryInterface, studyRepo repository.StudyRepositoryInterface) *BaseService {
 	return &BaseService{
 		wordRepo:  wordRepo,
 		groupRepo: groupRepo,

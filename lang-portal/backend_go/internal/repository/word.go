@@ -85,11 +85,11 @@ func (r *WordRepository) Update(word *models.Word) error {
 	return r.db.Save(word).Error
 }
 
-// Delete deletes a word
+// Delete deletes a word and its associated records
 func (r *WordRepository) Delete(id uint) error {
 	return r.WithTransaction(func(tx *gorm.DB) error {
 		// Delete word-group associations
-		if err := tx.Where("word_id = ?", id).Delete(&models.Word{}).Error; err != nil {
+		if err := tx.Exec("DELETE FROM word_groups WHERE word_id = ?", id).Error; err != nil {
 			return err
 		}
 		// Delete word reviews
@@ -97,21 +97,22 @@ func (r *WordRepository) Delete(id uint) error {
 			return err
 		}
 		// Delete the word
-		return tx.Delete(&models.Word{}, id).Error
+		return tx.Delete(&models.Word{}, "id = ?", id).Error
 	})
 }
 
 // GetStudyStats retrieves study statistics for a word
-func (r *WordRepository) GetStudyStats(id uint) (correctCount, wrongCount int, err error) {
-	var word models.Word
-	if err := r.db.Preload("Reviews").First(&word, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return 0, 0, ErrNotFound
-		}
+func (r *WordRepository) GetStudyStats(wordID uint) (int64, int64, error) {
+	var correct, wrong int64
+	err := r.db.Model(&models.WordReview{}).Where("word_id = ? AND correct = ?", wordID, true).Count(&correct).Error
+	if err != nil {
 		return 0, 0, err
 	}
-	correctCount, wrongCount = word.GetStudyStats()
-	return
+	err = r.db.Model(&models.WordReview{}).Where("word_id = ? AND correct = ?", wordID, false).Count(&wrong).Error
+	if err != nil {
+		return 0, 0, err
+	}
+	return correct, wrong, nil
 }
 
 // GetWordsByGroup retrieves words belonging to a group

@@ -6,7 +6,7 @@ import (
 
 // Group represents a thematic group of words
 type Group struct {
-	ID        uint           `gorm:"primarykey" json:"id" validate:"required"`
+	ID        uint           `gorm:"primarykey" json:"id"`
 	Name      string         `gorm:"not null;uniqueIndex" json:"name" validate:"required,min=1"`
 	CreatedAt time.Time      `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	Words     []Word         `gorm:"many2many:word_groups;" json:"words,omitempty"`

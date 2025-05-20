@@ -21,8 +21,8 @@ type Word struct {
 	Japanese     string `json:"japanese"`
 	Romaji       string `json:"romaji"`
 	English      string `json:"english"`
-	CorrectCount int    `json:"correct_count"`
-	WrongCount   int    `json:"wrong_count"`
+	CorrectCount int64  `json:"correct_count"`
+	WrongCount   int64  `json:"wrong_count"`
 }
 
 // WordDetail represents detailed word information
@@ -32,8 +32,8 @@ type WordDetail struct {
 	Romaji     string `json:"romaji"`
 	English    string `json:"english"`
 	StudyStats struct {
-		CorrectCount int `json:"correct_count"`
-		WrongCount   int `json:"wrong_count"`
+		CorrectCount int64 `json:"correct_count"`
+		WrongCount   int64 `json:"wrong_count"`
 	} `json:"study_stats"`
 	Groups []GroupInfo `json:"groups"`
 }
@@ -83,8 +83,8 @@ func (s *WordService) GetWord(id uint) (*WordDetail, error) {
 		Romaji:   word.Romaji,
 		English:  word.English,
 		StudyStats: struct {
-			CorrectCount int `json:"correct_count"`
-			WrongCount   int `json:"wrong_count"`
+			CorrectCount int64 `json:"correct_count"`
+			WrongCount   int64 `json:"wrong_count"`
 		}{
 			CorrectCount: correctCount,
 			WrongCount:   wrongCount,

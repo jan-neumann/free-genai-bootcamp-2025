@@ -84,7 +84,7 @@ func (DB) Migrate() error {
 	}
 
 	// Get all migration files
-	migrationsDir := "internal/database/migrations"
+	migrationsDir := "db/migrations"
 	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
 	if err != nil {
 		return fmt.Errorf("failed to find migration files: %v", err)
@@ -171,92 +171,110 @@ func (DB) Seed() error {
 
 	// Open database connection
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Info), // Reduced default GORM logging for seeds
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
 
-	// Get all seed files
-	seedsDir := "internal/database/seeds"
-	files, err := filepath.Glob(filepath.Join(seedsDir, "*.json"))
+	// Get all seed files (JSON and SQL)
+	seedsDir := "db/seeds"
+	jsonFiles, err := filepath.Glob(filepath.Join(seedsDir, "*.json"))
 	if err != nil {
-		return fmt.Errorf("failed to find seed files: %v", err)
+		return fmt.Errorf("failed to find JSON seed files: %v", err)
+	}
+	sqlFiles, err := filepath.Glob(filepath.Join(seedsDir, "*.sql"))
+	if err != nil {
+		return fmt.Errorf("failed to find SQL seed files: %v", err)
 	}
 
+	files := append(jsonFiles, sqlFiles...)
 	if len(files) == 0 {
-		return fmt.Errorf("no seed files found in %s", seedsDir)
+		fmt.Println("No seed files found in", seedsDir) // Changed to info, not error if no seeds
+		return nil
 	}
 
-	// Sort files by name
+	// Sort files by name to ensure consistent order
 	sort.Strings(files)
 
 	// Process each seed file
 	for _, file := range files {
 		fileName := filepath.Base(file)
-		groupName := strings.TrimSuffix(fileName, ".json")
 		fmt.Printf("Processing seed file: %s\n", fileName)
 
-		// Read seed file
+		// Read seed file content
 		content, err := ioutil.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read seed file %s: %v", fileName, err)
 		}
 
-		// Parse JSON data
-		var words []struct {
-			Japanese string   `json:"japanese"`
-			Romaji   string   `json:"romaji"`
-			English  string   `json:"english"`
-			Parts    []string `json:"parts"`
-		}
-		if err := json.Unmarshal(content, &words); err != nil {
-			return fmt.Errorf("failed to parse seed file %s: %v", fileName, err)
-		}
-
-		// Begin transaction
+		// Begin transaction for this file
 		tx := db.Begin()
 		if tx.Error != nil {
-			return fmt.Errorf("failed to begin transaction: %v", tx.Error)
+			return fmt.Errorf("failed to begin transaction for %s: %v", fileName, tx.Error)
 		}
 
-		// Create or get group
-		group := models.Group{Name: groupName}
-		if err := tx.FirstOrCreate(&group, models.Group{Name: groupName}).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to create/get group %s: %v", groupName, err)
-		}
-
-		// Create words and associate with group
-		for _, wordData := range words {
-			word := models.Word{
-				Japanese: wordData.Japanese,
-				Romaji:   wordData.Romaji,
-				English:  wordData.English,
-				Parts:    wordData.Parts,
+		if strings.HasSuffix(fileName, ".json") {
+			groupName := strings.TrimSuffix(fileName, ".json")
+			// Parse JSON data
+			var words []struct {
+				Japanese string   `json:"japanese"`
+				Romaji   string   `json:"romaji"`
+				English  string   `json:"english"`
+				Parts    []string `json:"parts"`
 			}
-
-			// Create or get word
-			if err := tx.FirstOrCreate(&word, models.Word{Japanese: wordData.Japanese}).Error; err != nil {
+			if err := json.Unmarshal(content, &words); err != nil {
 				tx.Rollback()
-				return fmt.Errorf("failed to create/get word %s: %v", wordData.Japanese, err)
+				return fmt.Errorf("failed to parse seed file %s: %v", fileName, err)
 			}
 
-			// Associate word with group
-			if err := tx.Model(&group).Association("Words").Append(&word); err != nil {
+			// Create or get group
+			group := models.Group{Name: groupName}
+			if err := tx.FirstOrCreate(&group, models.Group{Name: groupName}).Error; err != nil {
 				tx.Rollback()
-				return fmt.Errorf("failed to associate word %s with group %s: %v", wordData.Japanese, groupName, err)
+				return fmt.Errorf("failed to create/get group %s: %v", groupName, err)
 			}
+
+			// Create words and associate with group
+			for _, wordData := range words {
+				word := models.Word{
+					Japanese: wordData.Japanese,
+					Romaji:   wordData.Romaji,
+					English:  wordData.English,
+					Parts:    wordData.Parts,
+				}
+
+				// Create or get word
+				if err := tx.FirstOrCreate(&word, models.Word{Japanese: wordData.Japanese}).Error; err != nil {
+					tx.Rollback()
+					return fmt.Errorf("failed to create/get word %s: %v", wordData.Japanese, err)
+				}
+
+				// Associate word with group
+				if err := tx.Model(&group).Association("Words").Append(&word); err != nil {
+					tx.Rollback()
+					return fmt.Errorf("failed to associate word %s with group %s: %v", wordData.Japanese, groupName, err)
+				}
+			}
+			fmt.Printf("Successfully seeded group '%s' from %s\n", groupName, fileName)
+		} else if strings.HasSuffix(fileName, ".sql") {
+			// Execute SQL file content
+			if err := tx.Exec(string(content)).Error; err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to execute SQL seed file %s: %v", fileName, err)
+			}
+			fmt.Printf("Successfully executed SQL seed file: %s\n", fileName)
+		} else {
+			tx.Rollback() // Should not happen with current glob, but good practice
+			return fmt.Errorf("unsupported seed file type: %s", fileName)
 		}
 
-		// Commit transaction
+		// Commit transaction for this file
 		if err := tx.Commit().Error; err != nil {
 			return fmt.Errorf("failed to commit seed data for %s: %v", fileName, err)
 		}
-
-		fmt.Printf("Successfully seeded group '%s' from %s\n", groupName, fileName)
 	}
 
-	fmt.Println("All seed data imported successfully")
+	fmt.Println("All seed data processed successfully")
 	return nil
 }

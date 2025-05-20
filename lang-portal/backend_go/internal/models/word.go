@@ -13,6 +13,9 @@ type StringSlice []string
 
 // Value implements the driver.Valuer interface
 func (s StringSlice) Value() (driver.Value, error) {
+	if s == nil {
+		return json.Marshal([]string{})
+	}
 	return json.Marshal(s)
 }
 
@@ -22,12 +25,18 @@ func (s *StringSlice) Scan(value interface{}) error {
 		*s = StringSlice{}
 		return nil
 	}
-	return json.Unmarshal(value.([]byte), s)
+	var result []string
+	err := json.Unmarshal(value.([]byte), &result)
+	if err != nil {
+		return err
+	}
+	*s = StringSlice(result)
+	return nil
 }
 
 // Word represents a vocabulary word
 type Word struct {
-	ID        uint         `gorm:"primarykey" json:"id" validate:"required"`
+	ID        uint         `gorm:"primarykey" json:"id"`
 	Japanese  string       `gorm:"not null;index" json:"japanese" validate:"required,min=1"`
 	Romaji    string       `gorm:"not null" json:"romaji" validate:"required,min=1"`
 	English   string       `gorm:"not null" json:"english" validate:"required,min=1"`

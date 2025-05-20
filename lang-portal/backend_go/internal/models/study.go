@@ -6,7 +6,7 @@ import (
 
 // StudyActivity represents a specific study activity type
 type StudyActivity struct {
-	ID           uint           `gorm:"primarykey" json:"id" validate:"required"`
+	ID           uint           `gorm:"primarykey" json:"id"`
 	Name         string         `gorm:"not null;uniqueIndex" json:"name" validate:"required,min=1"`
 	Description  string         `gorm:"not null" json:"description" validate:"required,min=1"`
 	ThumbnailURL string         `gorm:"not null" json:"thumbnail_url" validate:"required,url"`
@@ -26,7 +26,7 @@ func (a *StudyActivity) Validate() error {
 
 // StudySession represents a study session
 type StudySession struct {
-	ID              uint          `gorm:"primarykey" json:"id" validate:"required"`
+	ID              uint          `gorm:"primarykey" json:"id"`
 	GroupID         uint          `gorm:"not null;index" json:"group_id" validate:"required"`
 	StudyActivityID uint          `gorm:"not null;index" json:"study_activity_id" validate:"required"`
 	CreatedAt       time.Time     `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
@@ -67,7 +67,7 @@ func (s *StudySession) GetSuccessRate() float64 {
 
 // WordReview represents a word review in a study session
 type WordReview struct {
-	ID             uint         `gorm:"primarykey" json:"id" validate:"required"`
+	ID             uint         `gorm:"primarykey" json:"id"`
 	WordID         uint         `gorm:"not null;index" json:"word_id" validate:"required"`
 	StudySessionID uint         `gorm:"not null;index" json:"study_session_id" validate:"required"`
 	Correct        bool         `gorm:"not null" json:"correct" validate:"required"`
