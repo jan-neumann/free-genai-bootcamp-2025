@@ -161,7 +161,7 @@ func DeleteWord(s *service.WordService) gin.HandlerFunc {
 
 func GetWordsByGroup(s *service.WordService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		groupID, err := strconv.ParseUint(c.Param("group_id"), 10, 32)
+		groupID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
 			return
@@ -393,7 +393,7 @@ func GetGroupStudyStats(s *service.GroupService) gin.HandlerFunc {
 
 func GetGroupsByWord(s *service.GroupService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		wordID, err := strconv.ParseUint(c.Param("word_id"), 10, 32)
+		wordID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid word ID"})
 			return

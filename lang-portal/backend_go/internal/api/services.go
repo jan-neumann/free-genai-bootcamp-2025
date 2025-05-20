@@ -39,7 +39,7 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 			words.POST("", CreateWord(services.Word))
 			words.PUT("/:id", UpdateWord(services.Word))
 			words.DELETE("/:id", DeleteWord(services.Word))
-			words.GET("/group/:group_id", GetWordsByGroup(services.Word))
+			words.GET("/:id/groups", GetGroupsByWord(services.Group))
 		}
 
 		// Group routes
@@ -53,7 +53,7 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 			groups.POST("/:id/words/:word_id", AddWordToGroup(services.Group))
 			groups.DELETE("/:id/words/:word_id", RemoveWordFromGroup(services.Group))
 			groups.GET("/:id/stats", GetGroupStudyStats(services.Group))
-			groups.GET("/word/:word_id", GetGroupsByWord(services.Group))
+			groups.GET("/:id/words", GetWordsByGroup(services.Word))
 		}
 
 		// Study routes
