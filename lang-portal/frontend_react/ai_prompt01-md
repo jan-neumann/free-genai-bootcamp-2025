@@ -1,0 +1,57 @@
+# Front End Prompt
+
+We would like to build a Japanese language learning web app.
+
+## Role/Profession
+Frontend Developer
+
+## Project Description
+
+### Project Brief
+
+We are building a japanese language learning web-app which serves the following purposes:
+- A portal to launch study activities
+- to store, group and explore japanese vocabulary
+- to review study progress
+
+The web-app is intended for desktop only, so we don't have to be concerned with mobile layouts.
+
+## Technical Requirements
+- React.js as frontend library
+- Tailwind CSS for styling
+- Vite.js as the local development server
+- TypeScript for the programming language
+- ShadCN for the UI components
+
+## Frontend Routes
+This is a list of routes for the web-app
+Each of these routes are pages and we'll describe
+them in more detail under the pages heading.
+
+ - /dashboard
+ - /study-activities
+ - /study-activities/:id
+ - /words
+ - /words/:id
+ - /groups
+ - /groups/:id
+ - /sessions
+ - /settings
+ - the default route / which redirects to /dashboard
+
+## Global Components
+
+### Navigation
+
+There will be a horizontal navigation bar with the following links:
+- Dashboard
+- Study Activities
+- Words
+- Word Groups
+- Sessions
+- Settings
+
+## Pages
+
+You will find information about the pages in the
+file `lang-portal/Frontend-Technical-Specs.md`
