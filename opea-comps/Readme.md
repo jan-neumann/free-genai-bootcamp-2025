@@ -43,4 +43,9 @@ A: It does not appear to download the model when we start the docker compose. We
 Q: Will the model be downloaded in the container?
 Does that mean the ml model will be deleted when the container stops running?
 
-The model will download into the container, and vanish when the container stops running. You need to mount a local drive and there is probably more work to be done.
+A: The model will download into the container, and vanish when the container stops running. You need to mount a local drive and there is probably more work to be done.
+
+Q: For the LLM service which can generate text, it suggests it will only work with TGI/vLLM and all you have to do is to have it running. Do TGI/vLLM have a standardized API or is there code to detect which one is running? Do we really have to use Xeon or Gaudi processors?
+
+A: vLLM, TGI (Text Generation Inference), and Ollama all offer APIs with OpenAI compatibility,
+so in theory they should be interchangeable. 
