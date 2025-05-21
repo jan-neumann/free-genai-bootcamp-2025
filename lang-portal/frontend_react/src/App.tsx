@@ -1,4 +1,5 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import type { LinkProps } from 'react-router-dom';
 import DashboardPage from '@/pages/DashboardPage';
 import StudyActivitiesPage from '@/pages/StudyActivitiesPage';
 import StudyActivityShowPage from '@/pages/StudyActivityShowPage';
@@ -9,16 +10,45 @@ import WordGroupsPage from '@/pages/WordGroupsPage';
 import WordGroupShowPage from '@/pages/WordGroupShowPage';
 import SessionsPage from '@/pages/SessionsPage';
 import SettingsPage from '@/pages/SettingsPage';
-import {
-  NavigationMenu,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
+import { cn } from '@/lib/utils';
 import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext';
 import Breadcrumbs from '@/components/layout/Breadcrumbs';
-// import './App.css'; // We can remove or repurpose this later
+
+// NavigationMenu components
+const NavigationMenu = ({ children }: { children: React.ReactNode }) => (
+  <nav className="flex items-center space-x-1">{children}</nav>
+);
+
+const NavigationMenuList = ({ children }: { children: React.ReactNode }) => (
+  <ul className="flex flex-row space-x-1">{children}</ul>
+);
+
+const NavigationMenuItem = ({ children }: { children: React.ReactNode }) => (
+  <li>{children}</li>
+);
+
+type NavigationMenuLinkProps = LinkProps & {
+  active?: boolean;
+  children: React.ReactNode;
+};
+
+const NavigationMenuLink = ({
+  active,
+  className,
+  children,
+  ...props
+}: NavigationMenuLinkProps) => (
+  <Link
+    className={cn(
+      'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 py-2 px-4',
+      active ? 'bg-accent text-accent-foreground' : 'text-foreground/60',
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </Link>
+);
 
 function App() {
   const location = useLocation();
@@ -33,31 +63,29 @@ function App() {
   ];
 
   return (
-    <>
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 max-w-screen-2xl items-center justify-center">
-          <NavigationMenu>
-            <NavigationMenuList>
-              {navLinks.map((navLink) => (
-                <NavigationMenuItem key={navLink.to}>
-                  <Link to={navLink.to}>
+    <BreadcrumbProvider>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-14 max-w-screen-2xl items-center justify-center">
+            <NavigationMenu>
+              <NavigationMenuList>
+                {navLinks.map((navLink) => (
+                  <NavigationMenuItem key={navLink.to}>
                     <NavigationMenuLink 
-                      active={location.pathname.startsWith(navLink.to)} 
-                      className={navigationMenuTriggerStyle()}
+                      to={navLink.to}
+                      active={location.pathname.startsWith(navLink.to)}
                     >
                       {navLink.label}
                     </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-              ))}
-            </NavigationMenuList>
-          </NavigationMenu>
-        </div>
-      </header>
-
-      <BreadcrumbProvider>
-        <Breadcrumbs />
-        <main className="p-4 md:p-8">
+                  </NavigationMenuItem>
+                ))}
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
+        </header>
+        
+        <main className="container py-6">
+          <Breadcrumbs />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -74,8 +102,8 @@ function App() {
             {/* <Route path="*" element={<div>Page Not Found</div>} /> */}
           </Routes>
         </main>
-      </BreadcrumbProvider>
-    </>
+      </div>
+    </BreadcrumbProvider>
   );
 }
 

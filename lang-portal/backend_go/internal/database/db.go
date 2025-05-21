@@ -13,7 +13,7 @@ import (
 // InitDB initializes the database connection, runs migrations, and seeds initial data
 func InitDB() (*gorm.DB, error) {
 	// Open SQLite database
-	db, err := gorm.Open(sqlite.Open("lang_portal.db"), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open("words.db"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {

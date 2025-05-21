@@ -18,7 +18,7 @@ func main() {
 	router := api.SetupRouter(db)
 
 	// Start server
-	if err := router.Run(":8080"); err != nil {
+	if err := router.Run(":8081"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
