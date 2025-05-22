@@ -8,6 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// Import the handlers package
+import handlers "lang-portal/backend_go/internal/api/handlers"
+
 // SetupRouter configures and returns a new Gin engine with all routes
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	router := gin.Default()
@@ -20,6 +23,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize services
 	baseService := service.NewBaseService(wordRepo, groupRepo, studyRepo)
 	dashboardService := service.NewDashboardService(baseService)
+	studyService := service.NewStudyService(baseService)
+	studyHandler := handlers.NewStudyHandler(studyService, db)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -31,7 +36,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			dashboard.GET("/stats", GetQuickStats(dashboardService))
 		}
 
-		// Add other route groups here (words, groups, study, etc.)
+		// Study activities routes
+		study := v1.Group("/study")
+		{
+			study.GET("/activities", studyHandler.GetStudyActivities)
+		}
 	}
 
 	return router

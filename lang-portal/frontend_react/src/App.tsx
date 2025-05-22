@@ -64,10 +64,11 @@ function App() {
 
   return (
     <BreadcrumbProvider>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col items-center">
         <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 max-w-screen-2xl items-center justify-center">
-            <NavigationMenu>
+          <div className="w-full max-w-[1400px] mx-auto px-4">
+            <div className="flex h-14 items-center justify-between">
+              <NavigationMenu>
               <NavigationMenuList>
                 {navLinks.map((navLink) => (
                   <NavigationMenuItem key={navLink.to}>
@@ -80,11 +81,12 @@ function App() {
                   </NavigationMenuItem>
                 ))}
               </NavigationMenuList>
-            </NavigationMenu>
+              </NavigationMenu>
+            </div>
           </div>
         </header>
         
-        <main className="container py-6">
+        <main className="w-full max-w-[1400px] px-4 py-6 mx-auto">
           <Breadcrumbs />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -102,6 +104,14 @@ function App() {
             {/* <Route path="*" element={<div>Page Not Found</div>} /> */}
           </Routes>
         </main>
+        
+        <footer className="w-full border-t border-border/40 mt-auto">
+          <div className="w-full max-w-[1400px] mx-auto px-4 py-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Language Learning Portal © {new Date().getFullYear()}
+            </p>
+          </div>
+        </footer>
       </div>
     </BreadcrumbProvider>
   );

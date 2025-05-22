@@ -10,10 +10,26 @@ import (
 func Seed(db *gorm.DB) error {
 	// Create study activities
 	activities := []models.StudyActivity{
-		{Name: "Reading Practice"},
-		{Name: "Writing Practice"},
-		{Name: "Listening Practice"},
-		{Name: "Speaking Practice"},
+		{
+			Name: "Reading Practice",
+			Description: "Practice reading Japanese text",
+			ThumbnailURL: "/images/reading.png",
+		},
+		{
+			Name: "Writing Practice",
+			Description: "Practice writing Japanese characters",
+			ThumbnailURL: "/images/writing.png",
+		},
+		{
+			Name: "Listening Practice",
+			Description: "Practice listening to Japanese",
+			ThumbnailURL: "/images/listening.png",
+		},
+		{
+			Name: "Speaking Practice",
+			Description: "Practice speaking Japanese",
+			ThumbnailURL: "/images/speaking.png",
+		},
 	}
 	if err := db.Create(&activities).Error; err != nil {
 		return err
