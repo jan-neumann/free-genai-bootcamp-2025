@@ -16,7 +16,6 @@ from comps.cores.proto.docarray import LLMParams
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
-import time
 
 
 EMBEDDING_SERVICE_HOST_IP = os.getenv("EMBEDDING_SERVICE_HOST_IP", "0.0.0.0")

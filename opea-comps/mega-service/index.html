@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Chat Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .thinking {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 5px 0;
+            font-style: italic;
+            color: #5d4037;
+            border-radius: 0 4px 4px 0;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #chat-box {
+            height: 400px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 15px;
+            overflow-y: auto;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        #user-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            margin-right: 0;
+        }
+        .assistant-message {
+            background-color: #f1f1f1;
+            margin-right: 20%;
+            margin-left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Chat</h1>
+        <div id="chat-box"></div>
+        <div>
+            <input type="text" id="user-input" placeholder="Type your message here..." />
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatBox = document.getElementById('chat-box');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+
+            function addMessage(role, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
+                
+                // Check if content contains <think> tags
+                const thinkMatch = content.match(/<think>(.*?)<\/think>(.*)/s);
+                
+                if (thinkMatch) {
+                    const thinkingContent = thinkMatch[1].trim();
+                    const actualContent = thinkMatch[2].trim();
+                    
+                    // Create thinking element
+                    const thinkingDiv = document.createElement('div');
+                    thinkingDiv.className = 'thinking';
+                    thinkingDiv.textContent = thinkingContent;
+                    
+                    // Create actual content element
+                    const contentDiv = document.createElement('div');
+                    contentDiv.textContent = actualContent;
+                    
+                    // Add both to message
+                    messageDiv.appendChild(thinkingDiv);
+                    messageDiv.appendChild(contentDiv);
+                } else {
+                    // Regular message without thinking
+                    messageDiv.textContent = content;
+                }
+                
+                chatBox.appendChild(messageDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            async function sendMessage() {
+                const message = userInput.value.trim();
+                if (!message) return;
+
+                // Add user message to chat
+                addMessage('user', message);
+                userInput.value = '';
+                sendButton.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:8000/v1/example-service', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: "qwen3:4b",
+                            messages: [
+                                {"role": "system", "content": "You are a helpful assistant."},
+                                {"role": "user", "content": message}
+                            ],
+                            temperature: 0.7,
+                            max_tokens: 500,
+                            stream: false
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('Response data:', data);
+                    
+                    // Extract the assistant's response
+                    if (data.choices && data.choices[0] && data.choices[0].message) {
+                        const assistantMessage = data.choices[0].message.content;
+                        addMessage('assistant', assistantMessage);
+                    } else {
+                        throw new Error('Unexpected response format: ' + JSON.stringify(data));
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMessage('system', `Error: ${error.message}`);
+                } finally {
+                    sendButton.disabled = false;
+                    userInput.focus();
+                }
+            }
+
+            // Event listeners
+            sendButton.addEventListener('click', sendMessage);
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
