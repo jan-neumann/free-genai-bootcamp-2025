@@ -6,11 +6,11 @@ services:
     image: ollama/ollama
     container_name: ollama-server
     ports:
-      - ${LLM_ENDPOINT_PORT:-8008}:11434
+      - ${LLM_ENDPOINT_PORT:-9000}:11434
     environment:
       LLM_MODEL_ID: "qwen3:4b"
       host_ip: host.docker.internal
 
 networks:
-  default:
+  default: 
     driver: bridge

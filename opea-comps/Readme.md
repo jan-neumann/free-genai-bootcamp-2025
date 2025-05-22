@@ -12,15 +12,16 @@ host_ip=host.docker.internal  # or your actual host IP
 
 ## Download (Pull) a model
 
-```
-curl http://localhost:8008/api/pull -d '{"model": "qwen3:4b"}'
+```bash
+curl http://localhost:9000/api/pull -d '{"model": "qwen3:4b"}'
 ```
 
 ## Ollama API
 
 Once the ollama-server is running, you can use the following curl command to test it:
-```
-curl --noproxy "*" http://localhost:8008/api/generate -d '{
+
+```bash
+curl --noproxy "*" http://localhost:9000/api/generate -d '{
   "model": "qwen3:4b",
   "prompt":"Why is the sky blue?"
 }'
@@ -30,11 +31,11 @@ curl --noproxy "*" http://localhost:8008/api/generate -d '{
 
 Q: Does bridge mode mean we can only access th Ollama API with another model in the docker compose?
 
-A: No, we can access the Ollama API with the host machine as well.
+A: No, we can access the Ollama API with the host machine as well.  
 
-Q: Which port is being mapped 8008->12345?
+Q: Which port is being mapped 9000->12345?
 
-A: 8008 is the port that the ollama-server is running on, 12345 is the port that the ollama-server is listening on.
+A: 9000 is the port that the ollama-server is running on, 12345 is the port that the ollama-server is listening on.
 
 Q: If we pass the LLM_MODEL_ID to the ollama server, will it download the model when we start the docker compose?
 
