@@ -1,0 +1,5 @@
+chromadb
+streamlit
+boto3
+youtube-transcript-api
+python-dotenv
