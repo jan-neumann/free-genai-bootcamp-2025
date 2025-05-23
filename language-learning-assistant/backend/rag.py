@@ -5,16 +5,16 @@ client = chromadb.Client()
 # Create collection. get_collection, get_or_create_collection, delete_collection also available!
 collection = client.create_collection("jlptn5-listening-comprehension")
 
-# Add docs to the collection. Can also update and delete. Row-based API coming soon!
+with open("./transcripts/doc1.txt", "r") as f, open("./transcripts/doc2.txt", "r") as g:
+    doc1 = f.read()
+    doc2 = g.read()
+    
 collection.add(
-    documents=[
-        "This is document1", 
-        "This is document2"
-        ], # we handle tokenization, embedding, and indexing automatically. You can skip that and add your own embeddings as well
+    documents=[doc1, doc2], # we handle tokenization, embedding, and indexing automatically. You can skip that and add your own embeddings as well
     metadatas=[
-        {"source": "notion"},
-         {"source": "google-docs"}
-         ], # filter on these!
+        {"source": "transcripts/doc1.txt"}, 
+        {"source": "transcripts/doc2.txt"}
+        ], # filter on these!
     ids=["doc1", "doc2"], # unique for each doc
 )
 

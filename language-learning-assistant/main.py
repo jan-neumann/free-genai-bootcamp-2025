@@ -4,9 +4,7 @@ import json
 from collections import Counter
 import re
 
-
 from backend.chat import BedrockChat
-
 
 # Page config
 st.set_page_config(
@@ -323,6 +321,3 @@ def main():
             "transcript_loaded": st.session_state.transcript is not None,
             "chat_messages": len(st.session_state.messages)
         })
-
-if __name__ == "__main__":
-    main()
