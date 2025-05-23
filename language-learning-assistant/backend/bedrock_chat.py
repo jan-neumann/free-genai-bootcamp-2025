@@ -8,12 +8,10 @@ from typing import Optional, Dict, Any
 # Model ID
 MODEL_ID = "amazon.nova-micro-v1:0"
 
-
-
 class BedrockChat:
     def __init__(self, model_id: str = MODEL_ID):
         """Initialize Bedrock chat client"""
-        self.bedrock_client = boto3.client('bedrock-runtime', region_name="us-east-1")
+        self.bedrock_client = boto3.client('bedrock-runtime', region_name="eu-central-1")
         self.model_id = model_id
 
     def generate_response(self, message: str, inference_config: Optional[Dict[str, Any]] = None) -> Optional[str]:
@@ -40,7 +38,7 @@ class BedrockChat:
 
 
 if __name__ == "__main__":
-    chat = BedrockChat()
+    chat = BedrockChat(model_id=MODEL_ID)
     while True:
         user_input = input("You: ")
         if user_input.lower() == '/exit':

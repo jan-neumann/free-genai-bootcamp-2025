@@ -4,7 +4,7 @@ import json
 from collections import Counter
 import re
 
-from backend.chat import BedrockChat
+from backend.groq_chat import GroqChat
 
 # Page config
 st.set_page_config(
@@ -41,7 +41,7 @@ def render_sidebar():
         selected_stage = st.radio(
             "Select Stage:",
             [
-                "1. Chat with Nova",
+                "1. Chat with Groq(Qwen)",
                 "2. Raw Transcript",
                 "3. Structured Data",
                 "4. RAG Implementation",
@@ -51,7 +51,7 @@ def render_sidebar():
         
         # Stage descriptions
         stage_info = {
-            "1. Chat with Nova": """
+            "1. Chat with Groq(Qwen)": """
             **Current Focus:**
             - Basic Japanese learning
             - Understanding LLM capabilities
@@ -94,15 +94,15 @@ def render_sidebar():
 
 def render_chat_stage():
     """Render an improved chat interface"""
-    st.header("Chat with Nova")
+    st.header("Chat with Groq(Qwen)")
 
-    # Initialize BedrockChat instance if not in session state
-    if 'bedrock_chat' not in st.session_state:
-        st.session_state.bedrock_chat = BedrockChat()
+    # Initialize GroqChat instance if not in session state
+    if 'groq_chat' not in st.session_state:
+        st.session_state.groq_chat = GroqChat()
 
     # Introduction text
     st.markdown("""
-    Start by exploring Nova's base Japanese language capabilities. Try asking questions about Japanese grammar, 
+    Start by exploring Groq(Qwen)'s base Japanese language capabilities. Try asking questions about Japanese grammar, 
     vocabulary, or cultural aspects.
     """)
 
@@ -153,7 +153,7 @@ def process_message(message: str):
 
     # Generate and display assistant's response
     with st.chat_message("assistant", avatar="🤖"):
-        response = st.session_state.bedrock_chat.generate_response(message)
+        response = st.session_state.groq_chat.generate_response(message)
         if response:
             st.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
@@ -303,7 +303,7 @@ def main():
     selected_stage = render_sidebar()
     
     # Render appropriate stage
-    if selected_stage == "1. Chat with Nova":
+    if selected_stage == "1. Chat with Groq(Qwen)":
         render_chat_stage()
     elif selected_stage == "2. Raw Transcript":
         render_transcript_stage()
@@ -321,3 +321,6 @@ def main():
             "transcript_loaded": st.session_state.transcript is not None,
             "chat_messages": len(st.session_state.messages)
         })
+
+if __name__ == "__main__":
+    main()
