@@ -18,6 +18,11 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return response.json();
 }
 
+export interface StudyActivityGroup {
+  id: number;
+  name: string;
+}
+
 export interface StudyActivity {
   id: number;
   name: string;
@@ -25,6 +30,7 @@ export interface StudyActivity {
   thumbnail_url?: string;
   total_sessions: number;
   last_session_date?: string;
+  available_groups?: StudyActivityGroup[];
 }
 
 export interface PaginatedResponse<T> {
@@ -33,6 +39,28 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   total_pages: number;
+}
+
+export interface StudySession {
+  id: number;
+  activity_id: number;
+  activity_name: string;
+  group_id: number;
+  group_name: string;
+  start_time: string;
+  end_time?: string;
+  score?: number;
+  total_questions: number;
+  correct_answers: number;
+}
+
+export interface StudySessionWord {
+  id: number;
+  word: string;
+  translation: string;
+  example: string;
+  reviewed: boolean;
+  correct: boolean;
 }
 
 export const studyApi = {
@@ -66,6 +94,55 @@ export const studyApi = {
   },
   
   getActivity: async (id: number): Promise<StudyActivity> => {
-    return fetchApi<StudyActivity>(`/study/activities/${id}`);
+    const response = await fetchApi<{
+      id: number;
+      name: string;
+      description: string;
+      thumbnail_url: string;
+      available_groups: Array<{
+        id: number;
+        name: string;
+      }>;
+    }>(`/api/study/activities/${id}`);
+    
+    return {
+      id: response.id,
+      name: response.name,
+      description: response.description,
+      thumbnail_url: response.thumbnail_url,
+      total_sessions: 0, // Not provided by the backend yet
+      last_session_date: undefined, // Not provided by the backend yet
+      available_groups: response.available_groups
+    };
   },
+
+  // Study Sessions
+  getSessions: async (): Promise<StudySession[]> => {
+    return fetchApi<StudySession[]>('/api/study/sessions');
+  },
+
+  getSession: async (id: number): Promise<StudySession> => {
+    return fetchApi<StudySession>(`/api/study/sessions/${id}`);
+  },
+
+  getSessionWords: async (sessionId: number): Promise<StudySessionWord[]> => {
+    return fetchApi<StudySessionWord[]>(`/api/study/sessions/${sessionId}/words`);
+  },
+
+  createSession: async (activityId: number, groupId: number): Promise<StudySession> => {
+    return fetchApi<StudySession>('/api/study/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        activity_id: activityId,
+        group_id: groupId
+      })
+    });
+  },
+
+  updateSession: async (id: number, data: Partial<StudySession>): Promise<StudySession> => {
+    return fetchApi<StudySession>(`/api/study/sessions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
 };

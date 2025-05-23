@@ -4,11 +4,12 @@ import DashboardPage from '@/pages/DashboardPage';
 import StudyActivitiesPage from '@/pages/StudyActivitiesPage';
 import StudyActivityShowPage from '@/pages/StudyActivityShowPage';
 import StudyActivityLaunchPage from '@/pages/StudyActivityLaunchPage';
+import StudySessionsPage from '@/pages/StudySessionsPage';
+import StudySessionDetailPage from '@/pages/StudySessionDetailPage';
 import WordsPage from '@/pages/WordsPage';
 import WordShowPage from '@/pages/WordShowPage';
 import WordGroupsPage from '@/pages/WordGroupsPage';
 import WordGroupShowPage from '@/pages/WordGroupShowPage';
-import SessionsPage from '@/pages/SessionsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import { cn } from '@/lib/utils';
 import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext';
@@ -98,7 +99,8 @@ function App() {
             <Route path="/words/:id" element={<WordShowPage />} />
             <Route path="/word-groups" element={<WordGroupsPage />} />
             <Route path="/word-groups/:id" element={<WordGroupShowPage />} />
-            <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/sessions" element={<StudySessionsPage />} />
+            <Route path="/sessions/:id" element={<StudySessionDetailPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             {/* Add a catch-all for 404 if desired */}
             {/* <Route path="*" element={<div>Page Not Found</div>} /> */}
