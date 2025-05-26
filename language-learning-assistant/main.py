@@ -5,6 +5,7 @@ from collections import Counter
 import re
 
 from backend.groq_chat import GroqChat
+from backend.get_transcript import YouTubeTranscriptDownloader
 
 # Page config
 st.set_page_config(
@@ -144,6 +145,29 @@ def render_chat_stage():
             st.session_state.messages = []
             st.rerun()
 
+def format_response_with_thinking(response: str) -> str:
+    """Format response to handle <think> tags specially"""
+    if not response:
+        return response
+        
+    # Split the response into parts based on <think> tags
+    parts = re.split(r'(<think>.*?</think>)', response, flags=re.DOTALL)
+    
+    formatted_parts = []
+    for part in parts:
+        if part.startswith('<think>') and part.endswith('</think>'):
+            # Format thinking content with a different style
+            thinking_content = part[7:-8].strip()  # Remove <think> tags
+            formatted_parts.append(
+                f'<div style="color: #666; font-style: italic; '
+                f'border-left: 3px solid #ddd; padding-left: 10px; margin: 5px 0;">'
+                f'💭 {thinking_content}</div>'
+            )
+        else:
+            formatted_parts.append(part)
+    
+    return ''.join(formatted_parts)
+
 def process_message(message: str):
     """Process a message and generate a response"""
     # Add user message to state and display
@@ -155,7 +179,9 @@ def process_message(message: str):
     with st.chat_message("assistant", avatar="🤖"):
         response = st.session_state.groq_chat.generate_response(message)
         if response:
-            st.markdown(response)
+            # Format the response to handle <think> tags
+            formatted_response = format_response_with_thinking(response)
+            st.markdown(formatted_response, unsafe_allow_html=True)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 
@@ -189,15 +215,25 @@ def render_transcript_stage():
     if url:
         if st.button("Download Transcript"):
             try:
-                downloader = YouTubeTranscriptDownloader()
-                transcript = downloader.get_transcript(url)
-                if transcript:
-                    # Store the raw transcript text in session state
-                    transcript_text = "\n".join([entry['text'] for entry in transcript])
-                    st.session_state.transcript = transcript_text
-                    st.success("Transcript downloaded successfully!")
-                else:
-                    st.error("No transcript found for this video.")
+                with st.spinner("Downloading transcript..."):
+                    downloader = YouTubeTranscriptDownloader()
+                    transcript = downloader.get_transcript(url)
+                    if transcript:
+                        # Store the raw transcript text in session state
+                        try:
+                            if isinstance(transcript, list):
+                                transcript_text = "\n".join([entry['text'] for entry in transcript])
+                            else:
+                                # Handle case where transcript is not in expected format
+                                st.warning("Unexpected transcript format. Trying to process...")
+                                transcript_text = str(transcript)
+                            
+                            st.session_state.transcript = transcript_text
+                            st.success("Transcript downloaded successfully!")
+                        except Exception as e:
+                            st.error(f"Error processing transcript: {str(e)}")
+                    else:
+                        st.error("No transcript found for this video.")
             except Exception as e:
                 st.error(f"Error downloading transcript: {str(e)}")
 
@@ -210,7 +246,8 @@ def render_transcript_stage():
                 label="Raw text",
                 value=st.session_state.transcript,
                 height=400,
-                disabled=True
+                disabled=True,
+                key="transcript_area"
             )
     
         else:
