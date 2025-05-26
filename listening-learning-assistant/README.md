@@ -42,3 +42,21 @@ This structure:
 ## Knowledgebase
 
 https://github.com/chroma-core/chroma
+
+## Additional Information
+
+### How to run frontend
+
+```sh
+source .venv/bin/activate
+streamlit run main.py
+```
+
+### How to run backend
+```sh
+source .venv/bin/activate
+cd backend
+pip install -r requirements.txt
+cd ..
+
+```

@@ -3,7 +3,7 @@ from typing import Dict
 import json
 from collections import Counter
 import re
-
+import os
 from backend.groq_chat import GroqChat
 from backend.get_transcript import YouTubeTranscriptDownloader
 
@@ -217,19 +217,38 @@ def render_transcript_stage():
             try:
                 with st.spinner("Downloading transcript..."):
                     downloader = YouTubeTranscriptDownloader()
+                    video_id = downloader.extract_video_id(url)
                     transcript = downloader.get_transcript(url)
                     if transcript:
                         # Store the raw transcript text in session state
                         try:
                             if isinstance(transcript, list):
                                 transcript_text = "\n".join([entry['text'] for entry in transcript])
+                                
+                                # Ensure the transcripts directory exists
+                                os.makedirs("backend/transcripts", exist_ok=True)
+                                
+                                # Save the transcript using the downloader's save_transcript method
+                                try:
+                                    # Save the transcript to a temporary file first
+                                    temp_success = downloader.save_transcript(transcript, f"{video_id}_temp")
+                                    
+                                    if temp_success:
+                                        # Move the file to the correct location
+                                        temp_path = f"transcripts/{video_id}_temp.txt"
+                                        target_path = f"backend/transcripts/{video_id}.txt"
+                                        os.rename(temp_path, target_path)
+                                        st.success(f"Transcript downloaded and saved to {target_path}")
+                                    else:
+                                        st.warning("Transcript downloaded but there was an issue saving to file")
+                                except Exception as e:
+                                    st.error(f"Error saving transcript: {str(e)}")
                             else:
                                 # Handle case where transcript is not in expected format
                                 st.warning("Unexpected transcript format. Trying to process...")
                                 transcript_text = str(transcript)
                             
                             st.session_state.transcript = transcript_text
-                            st.success("Transcript downloaded successfully!")
                         except Exception as e:
                             st.error(f"Error processing transcript: {str(e)}")
                     else:
