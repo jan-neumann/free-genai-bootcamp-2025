@@ -1,7 +1,13 @@
-from typing import Optional, Dict, List, Tuple
+import re
+from typing import Optional, Dict, List, Any
 import os
+import sys
+from pathlib import Path
 from groq import Groq
 from dotenv import load_dotenv
+
+# Suppress tokenizers parallelism warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Load environment variables
 load_dotenv()
@@ -142,35 +148,102 @@ class TranscriptStructurer:
             print(f"Error invoking Groq: {str(e)}")
             return None
 
+    def _clean_content(self, content: str) -> str:
+        """Clean the content by removing think tags and fixing any formatting issues"""
+        if not content:
+            return ""
+            
+        # First, remove all think tags and their contents
+        import re
+        cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+        
+        # Clean up any double newlines that might have been created
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        
+        # Remove any leading/trailing whitespace
+        return cleaned.strip()
+
     def structure_transcript(self, transcript: str) -> Dict[int, str]:
-        """Structure the transcript into three sections using separate prompts"""
+        """Structure the transcript into sections, skipping section 1"""
         results = {}
-        # Process all sections
-        for section_num in self.prompts.keys():
+        # Only process sections 2 and 3
+        for section_num in [2, 3]:
+            if section_num not in self.prompts:
+                print(f"Warning: No prompt defined for section {section_num}")
+                continue
+                
             print(f"Processing section {section_num}...")
             result = self._invoke_groq(self.prompts[section_num], transcript)
             if result:
-                results[section_num] = result
+                # Clean the content by removing <think> tags
+                cleaned_result = self._clean_content(result)
+                results[section_num] = cleaned_result
                 print(f"Section {section_num} processed successfully")
             else:
                 print(f"Failed to process section {section_num}")
         return results
 
     def save_questions(self, structured_sections: Dict[int, str], base_filename: str) -> bool:
-        """Save each section to a separate file"""
+        """Save structured sections to files.
+        
+        Args:
+            structured_sections: Dictionary mapping section numbers to their content
+            base_filename: Base path for output files
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
             # Create questions directory if it doesn't exist
             os.makedirs(os.path.dirname(base_filename), exist_ok=True)
             
-            # Save each section
+            # Process each section
             for section_num, content in structured_sections.items():
+                # Save to file
                 filename = f"{os.path.splitext(base_filename)[0]}_section{section_num}.txt"
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(content)
+                print(f"Saved section {section_num} to {filename}")
+                
             return True
+            
         except Exception as e:
             print(f"Error saving questions: {str(e)}")
             return False
+            
+    def parse_questions_from_content(self, content: str, section: int) -> List[Dict[str, Any]]:
+        """Parse questions from section content.
+        
+        Args:
+            content: The content to parse questions from
+            section: The section number
+            
+        Returns:
+            List of dictionaries containing question text and metadata
+        """
+        questions = []
+        # Split by question blocks
+        question_blocks = re.split(r'<question>', content)
+        
+        for block in question_blocks[1:]:  # Skip first empty block
+            if not block.strip():
+                continue
+                
+            # Extract situation and question
+            parts = re.split(r'</?question>', block, flags=re.DOTALL)
+            if len(parts) < 2:
+                continue
+                
+            question_text = parts[0].strip()
+            questions.append({
+                'text': question_text,
+                'metadata': {
+                    'section': section,
+                    'source': 'transcript_processing'
+                }
+            })
+            
+        return questions
 
     def load_transcript(self, filepath: str) -> Optional[str]:
         """Load transcript from file"""
@@ -194,35 +267,54 @@ class TranscriptStructurer:
             print(f"Error loading transcript: {str(e)}")
             return None
 
-if __name__ == "__main__":
-    # Example usage
+def process_transcript(transcript_path: str, output_dir: str = "questions") -> Dict[int, str]:
+    """Process a transcript file and save results to files.
+    
+    Args:
+        transcript_path: Path to the transcript file
+        output_dir: Directory to save the structured output
+        
+    Returns:
+        Dictionary mapping section numbers to their content, or empty dict on failure
+    """
     structurer = TranscriptStructurer()
     
-    # Define paths relative to the script location
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    transcript_path = os.path.join(script_dir, "transcripts/2zr8KZb1DUs.txt")
-    output_dir = os.path.join(script_dir, "questions")
-    output_base = os.path.join(output_dir, "output")
-    
-    # Create output directory if it doesn't exist
+    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
-    print(f"Loading transcript from: {transcript_path}")
+    # Generate output path
+    base_name = os.path.splitext(os.path.basename(transcript_path))[0]
+    output_path = os.path.join(output_dir, f"{base_name}.txt")
+    
+    print(f"Processing transcript: {transcript_path}")
     transcript = structurer.load_transcript(transcript_path)
     
-    if transcript:
-        print("Processing transcript...")
-        structured_sections = structurer.structure_transcript(transcript)
-        
-        if structured_sections:
-            print("\nSaving results...")
-            success = structurer.save_questions(
-                structured_sections, 
-                output_base
-            )
-            if success:
-                print(f"Results saved to {output_base}_sectionX.txt")
-            else:
-                print("Failed to save results")
-        else:
-            print("No sections were processed successfully")
+    if not transcript:
+        print("Failed to load transcript")
+        return {}
+    
+    print("Structuring transcript...")
+    structured_sections = structurer.structure_transcript(transcript)
+    
+    if not structured_sections:
+        print("No sections were processed successfully")
+        return {}
+    
+    print("Saving questions...")
+    if structurer.save_questions(structured_sections, output_path):
+        print(f"Successfully processed {len(structured_sections)} sections")
+    else:
+        print("Failed to save questions")
+    
+    return structured_sections
+
+if __name__ == "__main__":
+    # Process a single transcript
+    import sys
+    
+    if len(sys.argv) > 1:
+        transcript_path = sys.argv[1]
+    else:
+        transcript_path = "transcripts/2zr8KZb1DUs.txt"
+    
+    process_transcript(transcript_path)

@@ -1,0 +1,4 @@
+groq
+dotenv
+chromadb
+sentence-transformers

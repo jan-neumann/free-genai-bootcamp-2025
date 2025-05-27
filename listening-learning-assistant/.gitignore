@@ -20,9 +20,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# Generated questions
-backend/questions/
-
 # Virtual Environment
 venv/
 env/
@@ -60,6 +57,3 @@ chroma_db/
 # Local development
 local_settings.py
 
-# Transcripts
-transcripts/
-!transcripts/.keep
