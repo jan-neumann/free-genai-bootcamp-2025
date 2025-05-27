@@ -1,16 +1,20 @@
-from typing import Optional, Dict, List
-import boto3
+from typing import Optional, Dict, List, Tuple
 import os
+from groq import Groq
+from dotenv import load_dotenv
 
-# Model ID
-#MODEL_ID = "amazon.nova-micro-v1:0"
-MODEL_ID = "amazon.nova-lite-v1:0"
+# Load environment variables
+load_dotenv()
 
 class TranscriptStructurer:
-    def __init__(self, model_id: str = MODEL_ID):
-        """Initialize Bedrock client"""
-        self.bedrock_client = boto3.client('bedrock-runtime', region_name="us-east-1")
-        self.model_id = model_id
+    def __init__(self, model_name: str = "qwen-qwq-32b"):
+        """Initialize Groq client with Qwen model"""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY environment variable not set")
+            
+        self.client = Groq(api_key=api_key)
+        self.model_name = model_name
         self.prompts = {
             1: """Extract questions from section 問題1 of this JLPT transcript where the answer can be determined solely from the conversation without needing visual aids.
             
@@ -120,34 +124,36 @@ class TranscriptStructurer:
             """
         }
 
-    def _invoke_bedrock(self, prompt: str, transcript: str) -> Optional[str]:
-        """Make a single call to Bedrock with the given prompt"""
+    def _invoke_groq(self, prompt: str, transcript: str) -> Optional[str]:
+        """Make a single call to Groq with the given prompt"""
         full_prompt = f"{prompt}\n\nHere's the transcript:\n{transcript}"
         
-        messages = [{
-            "role": "user",
-            "content": [{"text": full_prompt}]
-        }]
-
         try:
-            response = self.bedrock_client.converse(
-                modelId=self.model_id,
-                messages=messages,
-                inferenceConfig={"temperature": 0}
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that processes JLPT test transcripts."},
+                    {"role": "user", "content": full_prompt}
+                ],
+                temperature=0.3
             )
-            return response['output']['message']['content'][0]['text']
+            return response.choices[0].message.content
         except Exception as e:
-            print(f"Error invoking Bedrock: {str(e)}")
+            print(f"Error invoking Groq: {str(e)}")
             return None
 
     def structure_transcript(self, transcript: str) -> Dict[int, str]:
         """Structure the transcript into three sections using separate prompts"""
         results = {}
-        # Skipping section 1 for now
-        for section_num in range(2, 4):
-            result = self._invoke_bedrock(self.prompts[section_num], transcript)
+        # Process all sections
+        for section_num in self.prompts.keys():
+            print(f"Processing section {section_num}...")
+            result = self._invoke_groq(self.prompts[section_num], transcript)
             if result:
                 results[section_num] = result
+                print(f"Section {section_num} processed successfully")
+            else:
+                print(f"Failed to process section {section_num}")
         return results
 
     def save_questions(self, structured_sections: Dict[int, str], base_filename: str) -> bool:
@@ -166,18 +172,57 @@ class TranscriptStructurer:
             print(f"Error saving questions: {str(e)}")
             return False
 
-    def load_transcript(self, filename: str) -> Optional[str]:
-        """Load transcript from a file"""
+    def load_transcript(self, filepath: str) -> Optional[str]:
+        """Load transcript from file"""
+        import os
+        # Convert to absolute path
+        abs_path = os.path.abspath(filepath)
+        print(f"Attempting to load transcript from: {abs_path}")
+        
+        # Check if file exists
+        if not os.path.exists(abs_path):
+            print(f"File does not exist at: {abs_path}")
+            print(f"Current working directory: {os.getcwd()}")
+            return None
+            
         try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                return f.read()
+            with open(abs_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                print(f"Successfully loaded {len(content)} characters from transcript")
+                return content
         except Exception as e:
             print(f"Error loading transcript: {str(e)}")
             return None
 
 if __name__ == "__main__":
+    # Example usage
     structurer = TranscriptStructurer()
-    transcript = structurer.load_transcript("backend/data/transcripts/sY7L5cfCWno.txt")
+    
+    # Define paths relative to the script location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    transcript_path = os.path.join(script_dir, "transcripts/2zr8KZb1DUs.txt")
+    output_dir = os.path.join(script_dir, "questions")
+    output_base = os.path.join(output_dir, "output")
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"Loading transcript from: {transcript_path}")
+    transcript = structurer.load_transcript(transcript_path)
+    
     if transcript:
+        print("Processing transcript...")
         structured_sections = structurer.structure_transcript(transcript)
-        structurer.save_questions(structured_sections, "backend/data/questions/sY7L5cfCWno.txt")
+        
+        if structured_sections:
+            print("\nSaving results...")
+            success = structurer.save_questions(
+                structured_sections, 
+                output_base
+            )
+            if success:
+                print(f"Results saved to {output_base}_sectionX.txt")
+            else:
+                print("Failed to save results")
+        else:
+            print("No sections were processed successfully")
