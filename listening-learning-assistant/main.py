@@ -324,35 +324,195 @@ def render_rag_stage():
         # Placeholder for LLM response
         st.info("Generated response will appear here")
 
+# Initialize session state for question management
+if 'current_question' not in st.session_state:
+    st.session_state.current_question = None
+if 'user_answer' not in st.session_state:
+    st.session_state.user_answer = None
+if 'show_feedback' not in st.session_state:
+    st.session_state.show_feedback = False
+
+def render_question(question):
+    """Render a question with options"""
+    # Display the question text with proper formatting
+    question_text = question.get('question', '')
+    
+    # Split into introduction, conversation, and question parts
+    parts = [p.strip() for p in question_text.split('\n\n') if p.strip()]
+    
+    if len(parts) >= 3:
+        # Keep introduction in English
+        intro = parts[0].replace('Introduction:', '').strip()
+        
+        # Process conversation lines
+        conversation = parts[1].replace('Conversation:', '').strip()
+        # Split into lines and ensure each line starts on a new line
+        conversation_lines = [line.strip() for line in conversation.split('\n') if line.strip()]
+        formatted_conversation = '\n'.join(conversation_lines)
+        
+        # Clean up question part
+        question_part = parts[2].replace('Question:', '').replace('質問:', '').strip()
+        
+        st.subheader("Listening Practice")
+        st.write(f"**Situation:** {intro}")
+        st.write("**Dialogue:**")
+        st.text(formatted_conversation)  # Use st.text to preserve newlines
+        st.write(f"**Question:** {question_part}")
+    else:
+        # Fallback if format doesn't match
+        st.subheader("Question")
+        st.write(question_text)
+    
+    # Display options
+    options = question.get('options', [])
+    if not options:
+        st.warning("No options available.")
+        return None
+    
+    # Create option labels (A, B, C, D)
+    option_letters = ['A', 'B', 'C', 'D']
+    
+    # Display radio buttons for options
+    selected_option = st.radio(
+        "Select your answer:",
+        option_letters[:len(options)],
+        format_func=lambda x: options[ord(x) - ord('A')] if ord(x) - ord('A') < len(options) else ""
+    )
+    
+    # Check answer button with unique key
+    if st.button("Check Answer", key="check_answer_btn"):
+        st.session_state.user_answer = selected_option
+        st.session_state.show_feedback = True
+        st.rerun()
+    
+    return selected_option
+
+def render_feedback(question, user_answer, question_type, topic=None):
+    """Render feedback for the user's answer"""
+    if user_answer is None:
+        return
+        
+    st.subheader("Feedback")
+    
+    # Get the correct answer letter
+    correct_idx = question.get('correct_answer', 0)
+    correct_letter = chr(ord('A') + correct_idx)
+    
+    if user_answer == correct_letter:
+        st.success("✅ Correct!")
+    else:
+        st.error(f"❌ Incorrect. The correct answer is {correct_letter}.")
+    
+    # Show explanation if available
+    explanation = question.get('explanation', '')
+    if explanation:
+        st.info(f"💡 **Explanation:** {explanation}")
+    
+    # Show raw response for debugging if available with unique key
+    if 'raw_response' in question and st.checkbox("Show debug info", key="debug_info_checkbox"):
+        with st.expander("Debug: Raw Response"):
+            st.text(question['raw_response'])
+    
+    # Add a button to try another question with unique key
+    if st.button("Next Question", key="next_question_btn"):
+        # Clear the current question and feedback state
+        st.session_state.current_question = None
+        st.session_state.user_answer = None
+        st.session_state.show_feedback = False
+        # Generate a new question
+        generate_new_question(question_type, topic)
+        st.rerun()
+
+def generate_new_question(question_type, topic=None):
+    """Generate a new question and update session state"""
+    with st.spinner(f"Generating {question_type.lower()} question..."):
+        try:
+            # Import here to catch import errors
+            try:
+                from backend.question_generator import question_generator
+            except ImportError as ie:
+                st.error(f"Import error: {str(ie)}")
+                print(f"Import error: {str(ie)}")
+                return
+                
+            # Generate the question
+            question = question_generator.generate_question(
+                question_type=question_type,
+                topic=topic if topic else None
+            )
+            
+            if question:
+                st.session_state.current_question = question
+                st.session_state.user_answer = None
+                st.session_state.show_feedback = False
+                st.rerun()
+            else:
+                error_msg = "Failed to generate question. The response format might be incorrect."
+                st.error(error_msg)
+                print(error_msg)
+                
+        except Exception as e:
+            error_msg = f"Error generating question: {str(e)}"
+            st.error(error_msg)
+            print(error_msg)
+            
+            # Print traceback for debugging
+            import traceback
+            print("\n" + "="*50)
+            print("Full traceback:")
+            traceback.print_exc()
+            print("="*50 + "\n")
+
 def render_interactive_stage():
     """Render the interactive learning stage"""
     st.header("Interactive Learning")
     
     # Practice type selection
-    practice_type = st.selectbox(
-        "Select Practice Type",
-        ["Dialogue Practice", "Vocabulary Quiz", "Listening Exercise"]
-    )
-    
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("Practice Scenario")
-        # Placeholder for scenario
-        st.info("Practice scenario will appear here")
-        
-        # Placeholder for multiple choice
-        options = ["Option 1", "Option 2", "Option 3", "Option 4"]
-        selected = st.radio("Choose your answer:", options)
-        
+        selected_type = st.selectbox(
+            "Select Practice Type",
+            ["Dialogue Practice", "Vocabulary Quiz", "Listening Exercise"]
+        )
+    
     with col2:
-        st.subheader("Audio")
-        # Placeholder for audio player
-        st.info("Audio will appear here")
+        topic = st.text_input("Topic (optional)", "")
+    
+    # Generate new question button
+    if st.button("Generate New Question"):
+        generate_new_question(selected_type, topic if topic else None)
+    
+    # Display current question or placeholder
+    if st.session_state.current_question:
+        question = st.session_state.current_question
         
-        st.subheader("Feedback")
-        # Placeholder for feedback
-        st.info("Feedback will appear here")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Display question and options
+            user_answer = render_question(question)
+            
+            # Show feedback if available
+            if st.session_state.show_feedback:
+                render_feedback(
+                    question, 
+                    st.session_state.user_answer,
+                    selected_type,
+                    topic if topic else None
+                )
+        
+        with col2:
+            # Placeholder for audio (could be implemented later)
+            st.subheader("Audio")
+            st.info("Audio player will appear here")
+            
+            # Show additional context if available
+            if 'context' in question:
+                with st.expander("Additional Context"):
+                    st.write(question['context'])
+    else:
+        st.info("Click 'Generate New Question' to start practicing!")
 
 def main():
     render_header()
