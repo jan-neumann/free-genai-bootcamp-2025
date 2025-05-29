@@ -334,34 +334,26 @@ if 'show_feedback' not in st.session_state:
 
 def render_question(question):
     """Render a question with options"""
-    # Display the question text with proper formatting
-    question_text = question.get('question', '')
-    
-    # Split into introduction, conversation, and question parts
-    parts = [p.strip() for p in question_text.split('\n\n') if p.strip()]
-    
-    if len(parts) >= 3:
-        # Keep introduction in English
-        intro = parts[0].replace('Introduction:', '').strip()
-        
-        # Process conversation lines
-        conversation = parts[1].replace('Conversation:', '').strip()
-        # Split into lines and ensure each line starts on a new line
-        conversation_lines = [line.strip() for line in conversation.split('\n') if line.strip()]
-        formatted_conversation = '\n'.join(conversation_lines)
-        
-        # Clean up question part
-        question_part = parts[2].replace('Question:', '').replace('質問:', '').strip()
-        
+    intro_text = question.get('introduction', '')
+    conversation_text = question.get('conversation', '')
+    actual_question_text = question.get('question', '')
+
+    if intro_text and conversation_text and actual_question_text:
         st.subheader("Listening Practice")
-        st.write(f"**Situation:** {intro}")
+        if intro_text:
+            st.write(f"**Situation:** {intro_text}")
         st.write("**Dialogue:**")
+        # Process conversation lines to ensure newlines are respected
+        conversation_lines = [line.strip() for line in conversation_text.split('\n') if line.strip()]
+        formatted_conversation = '\n'.join(conversation_lines)
         st.text(formatted_conversation)  # Use st.text to preserve newlines
-        st.write(f"**Question:** {question_part}")
-    else:
-        # Fallback if format doesn't match
+        st.write(f"**Question:** {actual_question_text}")
+    elif actual_question_text: # Fallback if only question text is available
         st.subheader("Question")
-        st.write(question_text)
+        st.write(actual_question_text)
+    else:
+        st.warning("Question data is not in the expected format.")
+        return None
     
     # Display options
     options = question.get('options', [])

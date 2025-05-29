@@ -17,8 +17,8 @@ A progressive learning tool that demonstrates how RAG and agents can enhance lan
 **Technical Restrictions:**
 * Must use Amazon Bedrock for:
    * API (converse, guardrails, embeddings, agents) (https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
-     * Aamzon Nova Micro for text generation (https://aws.amazon.com/ai/generative-ai/nova)
-   * Titan for embeddings
+* Amazon Nova Micro for text generation (https://aws.amazon.com/ai/generative-ai/nova)
+* Titan for embeddings
 * Must implement in Streamlit, pandas (data visualization)
 * Must use SQLite for vector storage
 * Must handle YouTube transcripts as knowledge source (YouTubeTranscriptApi: https://pypi.org/project/youtube-transcript-api/)
@@ -42,6 +42,7 @@ This structure:
 ## Knowledgebase
 
 https://github.com/chroma-core/chroma
+
 
 ## Additional Information
 
