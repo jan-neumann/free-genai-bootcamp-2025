@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 from groq import Groq
 from dotenv import load_dotenv
 import logging
+import random
 
 # Use absolute import
 from backend.vector_store import initialize_vector_store
@@ -23,15 +24,19 @@ class QuestionGenerator:
 
     IMPORTANT: Your response must ONLY be a single, valid JSON object. 
     Do NOT include any of your thought process, reasoning, explanations, or any text whatsoever outside of the JSON object itself. 
-    The JSON object must contain the following three string keys: "introduction", "conversation", and "question".
-    The response must start with '{{' and end with '}}' and be parsable by Python's json.loads().
+    The JSON object must contain the following five string/list keys: "introduction", "conversation", "question", "options", and "correct_answer_letter".
+    - "introduction", "conversation", "question", and "correct_answer_letter" must be strings.
+    - "options" must be a list of four strings.
+    The response must start with '{{' and end with '}}', be parsable by Python's json.loads(), and be a complete, well-formed JSON structure.
 
     Example of the required JSON structure:
     <JSON>
     {{
         "introduction": "男の人と女の人が話しています。",
         "conversation": "女：今朝のニュース見た？\\n男：ううん、まだ見てないよ。何かあったの？\\n女：駅の近くに新しいレストランができたって。",
-        "question": "二人は何について話していますか？"
+        "question": "二人は何について話していますか？",
+        "options": ["レストランができたこと", "天気のこと", "仕事のこと", "週末の予定"],
+        "correct_answer_letter": "A"
     }}
     </JSON>
 
@@ -40,11 +45,14 @@ class QuestionGenerator:
     2. Keep the conversation natural, simple, and appropriate for N5 listening practice.
     3. Use ONLY Japanese characters (hiragana, katakana, N5 kanji, and standard Japanese punctuation) within the Japanese text values. Do NOT use English, Chinese, or any other non-Japanese characters in these values.
     4. The conversation should be about: {topic}
+    5. JSON SYNTAX IS CRITICAL: All string values must be perfectly enclosed in double quotes ("). Ensure commas correctly separate key-value pairs. "options" must be a JSON array of strings.
+    6. Provide four distinct multiple-choice options for the question.
+    7. Indicate the correct answer by providing its letter (A, B, C, or D) as the value for "correct_answer_letter".
 
     Return ONLY the JSON object enclosed between <JSON> and </JSON> tags.
     """
 
-    def __init__(self, model_name: str = "llama3-8b-8192"):
+    def __init__(self, model_name: str = "deepseek-r1-distill-llama-70b"):
         """Initialize the question generator with Groq client and vector store"""
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
@@ -100,10 +108,10 @@ class QuestionGenerator:
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
-                    {"role": "system", "content": "You are a Japanese language teaching assistant for JLPT N5 level. Your entire response MUST be a single, valid JSON object as per the user's instructions. Do not include any other text, explanations, or thought processes outside this JSON object."},
+                    {"role": "system", "content": "You are a Japanese language teaching assistant for JLPT N5 level. Your entire response MUST be a single, valid, complete JSON object as per the user's instructions, starting with '{{' and ending with '}}'. Do not include any other text, explanations, or thought processes outside this JSON object."},
                     {"role": "user", "content": final_prompt}
                 ],
-                temperature=0.7,
+                temperature=0.3,
                 max_tokens=1024 
             )
 
@@ -113,7 +121,7 @@ class QuestionGenerator:
                 return None
             
             raw_response_content = response.choices[0].message.content.strip()
-            # logging.info(f"Raw response content from API:\n{raw_response_content}")
+            logging.info(f"Raw response content from API:\n{raw_response_content}")
 
         except Exception as e:
             logging.error(f"Error calling Groq API: {type(e).__name__} - {str(e)}")
@@ -144,14 +152,32 @@ class QuestionGenerator:
             json_str_to_parse = re.sub(r'\s*```$', '', json_str_to_parse)
             json_str_to_parse = json_str_to_parse.strip()
 
+            # Heuristic: If the string starts with '{' and doesn't end with '}',
+            # and isn't just an empty opening brace, try appending '}'
+            if json_str_to_parse.startswith('{') and not json_str_to_parse.endswith('}') and len(json_str_to_parse.strip()) > 1:
+                logging.info("Attempting to fix potentially truncated JSON by appending '}'.")
+                json_str_to_parse += '}'
+
+            logging.info(f"Attempting to parse: '{json_str_to_parse}'")
             # Attempt to parse the (potentially cleaned) JSON string
             data = json.loads(json_str_to_parse)
             
-            if isinstance(data, dict) and all(k in data for k in ['introduction', 'conversation', 'question']):
-                parsed_data_dict = data
-                # logging.info("Successfully parsed JSON data.")
+            required_keys = ['introduction', 'conversation', 'question', 'options', 'correct_answer_letter']
+            if isinstance(data, dict) and all(k in data for k in required_keys):
+                options_ok = isinstance(data.get('options'), list) and len(data.get('options')) == 4 and all(isinstance(opt, str) for opt in data.get('options'))
+                letter_ok = isinstance(data.get('correct_answer_letter'), str) and data.get('correct_answer_letter', '').upper() in ['A', 'B', 'C', 'D']
+                
+                if options_ok and letter_ok:
+                    parsed_data_dict = data
+                    # logging.info("Successfully parsed JSON data with all required keys and valid option/answer format.")
+                else:
+                    if not options_ok:
+                        logging.warning(f"Parsed JSON 'options' field is not a list of 4 strings. Found: {data.get('options')}")
+                    if not letter_ok:
+                        logging.warning(f"Parsed JSON 'correct_answer_letter' is not a valid letter (A-D). Found: {data.get('correct_answer_letter')}")
             else:
-                logging.warning(f"Parsed JSON does not contain all required keys ('introduction', 'conversation', 'question'). Found: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                missing_keys = [k for k in required_keys if k not in (data.keys() if isinstance(data, dict) else [])]
+                logging.warning(f"Parsed JSON does not contain all required keys. Missing: {missing_keys}. Found: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
                 # logging.debug(f"Problematic JSON data: {data}")
 
         except json.JSONDecodeError as e:
@@ -164,11 +190,21 @@ class QuestionGenerator:
                     # logging.info(f"Attempting to parse extracted JSON substring: {json_substring}")
                     try:
                         data = json.loads(json_substring)
-                        if isinstance(data, dict) and all(k in data for k in ['introduction', 'conversation', 'question']):
-                            parsed_data_dict = data
-                            # logging.info("Successfully parsed JSON substring.")
+                        required_keys_fallback = ['introduction', 'conversation', 'question', 'options', 'correct_answer_letter']
+                        if isinstance(data, dict) and all(k in data for k in required_keys_fallback):
+                            options_ok_fallback = isinstance(data.get('options'), list) and len(data.get('options')) == 4 and all(isinstance(opt, str) for opt in data.get('options'))
+                            letter_ok_fallback = isinstance(data.get('correct_answer_letter'), str) and data.get('correct_answer_letter', '').upper() in ['A', 'B', 'C', 'D']
+                            if options_ok_fallback and letter_ok_fallback:
+                                parsed_data_dict = data
+                                # logging.info("Successfully parsed JSON substring with all required keys and valid option/answer format.")
+                            else:
+                                if not options_ok_fallback:
+                                    logging.warning(f"Substring JSON 'options' field is not a list of 4 strings. Found: {data.get('options')}")
+                                if not letter_ok_fallback:
+                                    logging.warning(f"Substring JSON 'correct_answer_letter' is not a valid letter (A-D). Found: {data.get('correct_answer_letter')}")
                         else:
-                            logging.warning("Substring JSON does not contain required keys after fallback.")
+                            missing_keys_fallback = [k for k in required_keys_fallback if k not in (data.keys() if isinstance(data, dict) else [])]
+                            logging.warning(f"Substring JSON does not contain all required keys after fallback. Missing: {missing_keys_fallback}. Found: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
                     except json.JSONDecodeError as sub_e:
                         logging.error(f"Failed to parse JSON substring after fallback: {sub_e}")
                 else:
@@ -201,14 +237,50 @@ class QuestionGenerator:
 
             # logging.info(f"Cleaned data - Intro: '{intro}', Convo: '{conversation_cleaned}', Question: '{question_text}'")
 
+            # Get options, default to empty strings if missing or not a list
+            options_raw = parsed_data_dict.get('options', [])
+            if not isinstance(options_raw, list) or len(options_raw) != 4:
+                logging.warning(f"'options' field is not a list of 4 elements. Received: {options_raw}. Using placeholders.")
+                options_raw = ["Option A placeholder", "Option B placeholder", "Option C placeholder", "Option D placeholder"]
+            
+            cleaned_options = [self._clean_text(str(opt)) for opt in options_raw] # Ensure opt is str before cleaning
+
+            correct_letter = parsed_data_dict.get('correct_answer_letter', 'A').upper()
+            correct_idx = 0 # Default to 0 (A)
+            if 'A' <= correct_letter <= 'D':
+                correct_idx = ord(correct_letter) - ord('A')
+            else:
+                logging.warning(f"Invalid 'correct_answer_letter' received: '{correct_letter}'. Defaulting to A (index 0).")
+                correct_idx = 0 # Explicitly set default if invalid
+
+            # Store the text of the correct answer before shuffling
+            if 0 <= correct_idx < len(cleaned_options):
+                correct_answer_text = cleaned_options[correct_idx]
+            else:
+                # Fallback if correct_idx is somehow out of bounds (shouldn't happen with current logic)
+                logging.warning(f"Initial correct_idx {correct_idx} out of bounds for options length {len(cleaned_options)}. Defaulting to first option as correct.")
+                correct_answer_text = cleaned_options[0] if cleaned_options else ""
+                correct_idx = 0
+
+            # Shuffle the options
+            random.shuffle(cleaned_options)
+
+            # Find the new index of the correct answer text in the shuffled list
+            try:
+                final_correct_idx = cleaned_options.index(correct_answer_text)
+            except ValueError:
+                # This should ideally not happen if correct_answer_text was in cleaned_options
+                logging.error(f"Correct answer text '{correct_answer_text}' not found in shuffled options. Defaulting to 0.")
+                final_correct_idx = 0
+
             return {
                 'introduction': intro,
                 'conversation': conversation_cleaned,
                 'question': question_text,
-                'options': ["A) はい", "B) いいえ", "C) わかりません", "D) もう一度お願いします"], # Placeholder options
-                'correct_answer': "A",  # Placeholder, should match one of the options' letters
-                'explanation': "", # Placeholder
-                'raw_response': raw_response_content # For debugging
+                'options': cleaned_options,
+                'correct_answer': final_correct_idx,
+                'explanation': "", # Placeholder for now
+                'raw_response': raw_response_content
             }
         except Exception as e:
             logging.error(f"Error processing parsed data into final dictionary: {type(e).__name__} - {str(e)}")
