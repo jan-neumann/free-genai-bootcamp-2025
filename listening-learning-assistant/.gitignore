@@ -57,3 +57,7 @@ chroma_db/
 # Local development
 local_settings.py
 
+# Temporary files
+data
+
+

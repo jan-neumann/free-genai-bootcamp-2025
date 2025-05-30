@@ -4,6 +4,7 @@ import json
 from collections import Counter
 import re
 import os
+import uuid
 from backend.groq_chat import GroqChat
 from backend.get_transcript import YouTubeTranscriptDownloader
 
@@ -19,6 +20,11 @@ if 'transcript' not in st.session_state:
     st.session_state.transcript = None
 if 'messages' not in st.session_state:
     st.session_state.messages = []
+# Path for storing question history
+HISTORY_FILE_PATH = "listening-learning-assistant/data/question_history.json"
+
+if 'generated_questions_history' not in st.session_state:
+    st.session_state.generated_questions_history = [] # Will be populated by load_question_history()
 
 def render_header():
     """Render the header section"""
@@ -90,6 +96,8 @@ def render_sidebar():
         
         st.markdown("---")
         st.markdown(stage_info[selected_stage])
+        
+        render_question_history_sidebar() # Display question history
         
         return selected_stage
 
@@ -375,6 +383,19 @@ def render_question(question):
     if st.button("Check Answer", key="check_answer_btn"):
         st.session_state.user_answer = selected_option
         st.session_state.show_feedback = True
+        
+        # Mark this question as answered in the history
+        if st.session_state.current_question and 'question_id' in st.session_state.current_question:
+            current_q_id = st.session_state.current_question['question_id']
+            history_updated = False
+            for hist_q in st.session_state.generated_questions_history:
+                if hist_q.get('question_id') == current_q_id:
+                    if not hist_q.get('answered_in_main_ui', False):
+                        hist_q['answered_in_main_ui'] = True
+                        history_updated = True
+                    break
+            if history_updated:
+                save_question_history()
         st.rerun()
     
     return selected_option
@@ -434,7 +455,17 @@ def generate_new_question(question_type, topic=None):
             )
             
             if question:
+                # Add unique ID and answered status before storing
+                question['question_id'] = str(uuid.uuid4())
+                question['answered_in_main_ui'] = False
+                
                 st.session_state.current_question = question
+                # Store in history
+                if 'generated_questions_history' not in st.session_state: # Defensive initialization
+                    st.session_state.generated_questions_history = []
+                st.session_state.generated_questions_history.append(question)
+                save_question_history() # Save after adding new question
+                
                 st.session_state.user_answer = None
                 st.session_state.show_feedback = False
                 st.rerun()
@@ -454,6 +485,44 @@ def generate_new_question(question_type, topic=None):
             print("Full traceback:")
             traceback.print_exc()
             print("="*50 + "\n")
+
+def render_question_history_sidebar():
+    if 'generated_questions_history' in st.session_state and st.session_state.generated_questions_history:
+        with st.sidebar:
+            st.markdown("---") # Separator
+            st.subheader("Question History")
+            # Display in reverse order (newest first)
+            for i, q_item in enumerate(reversed(st.session_state.generated_questions_history)):
+                question_text = q_item.get('question', 'N/A')
+                # Truncate for display if too long
+                display_text = (question_text[:30] + '...') if len(question_text) > 33 else question_text
+                
+                # Use an expander for each question to show more details
+                with st.expander(f"Q{len(st.session_state.generated_questions_history) - i}: {display_text}"):
+                    st.markdown(f"**Introduction:** {q_item.get('introduction', 'N/A')}")
+                    st.markdown(f"**Conversation:**")
+                    # Conversation text from LLM often has '\\n', split by that and join with actual newline for display
+                    conversation_lines = [line.strip() for line in q_item.get('conversation', '').split('\\n') if line.strip()]
+                    formatted_conversation = '\n'.join(conversation_lines)
+                    st.text(formatted_conversation) # Use st.text to preserve newlines
+                    st.markdown(f"**Question:** {question_text}")
+                    options = q_item.get('options', [])
+                    correct_idx = q_item.get('correct_answer', -1)
+                    if options:
+                        st.markdown("**Options:**")
+                        question_answered = q_item.get('answered_in_main_ui', False)
+                        for opt_idx, opt_text in enumerate(options):
+                            if question_answered:
+                                prefix = "✅" if opt_idx == correct_idx else "❌" # Show correct/incorrect if answered
+                            else:
+                                prefix = "➡️" # Neutral if not yet answered in main UI
+                            st.markdown(f"{prefix} {chr(ord('A') + opt_idx)}. {opt_text}")
+                    # Potential future enhancement: Button to reload this question
+                    # if st.button(f"View Q{len(st.session_state.generated_questions_history) - i}", key=f"history_q_{i}_{q_item.get('question_id', i)}"): # Ensure unique key
+                    #     st.session_state.current_question = q_item
+                    #     st.session_state.user_answer = None
+                    #     st.session_state.show_feedback = False
+                    #     st.rerun()
 
 def render_interactive_stage():
     """Render the interactive learning stage"""
@@ -506,7 +575,36 @@ def render_interactive_stage():
     else:
         st.info("Click 'Generate New Question' to start practicing!")
 
+def load_question_history():
+    """Loads question history from the JSON file into session state."""
+    try:
+        if os.path.exists(HISTORY_FILE_PATH):
+            with open(HISTORY_FILE_PATH, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+                # Basic validation: ensure it's a list
+                if isinstance(history, list):
+                    st.session_state.generated_questions_history = history
+                else:
+                    st.session_state.generated_questions_history = []
+                    logging.warning(f"History file {HISTORY_FILE_PATH} did not contain a list.")
+        else:
+            st.session_state.generated_questions_history = []
+    except (json.JSONDecodeError, IOError) as e:
+        logging.error(f"Error loading question history from {HISTORY_FILE_PATH}: {e}")
+        st.session_state.generated_questions_history = [] # Reset on error
+
+def save_question_history():
+    """Saves the current question history from session state to the JSON file."""
+    try:
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(HISTORY_FILE_PATH), exist_ok=True)
+        with open(HISTORY_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.generated_questions_history, f, ensure_ascii=False, indent=4)
+    except IOError as e:
+        logging.error(f"Error saving question history to {HISTORY_FILE_PATH}: {e}")
+
 def main():
+    load_question_history() # Load history at the start
     render_header()
     selected_stage = render_sidebar()
     
