@@ -1,4 +1,7 @@
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 from typing import Dict
 import json
 from collections import Counter
@@ -7,7 +10,9 @@ import os
 import uuid
 from backend.groq_chat import GroqChat
 from backend.get_transcript import YouTubeTranscriptDownloader
-from backend.audio_generator import generate_audio, AUDIO_CACHE_DIR, ensure_audio_cache_dir
+from backend.audio_generator import generate_audio, AUDIO_CACHE_DIR, ensure_audio_cache_dir, DEFAULT_ELEVENLABS_VOICE_ID_A, DEFAULT_ELEVENLABS_VOICE_ID_B
+from pydub import AudioSegment
+import io # For BytesIO if needed for pydub
 import hashlib
 import logging # Added import
 
@@ -16,6 +21,105 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Audio Playback Helper ---
+
+def play_conversation_audio(conversation_text: str, item_id: str):
+    """
+    Generates (if needed) and plays audio for the conversation.
+    Assigns different voices to different speakers and concatenates audio segments.
+    """
+    if not conversation_text:
+        st.caption("No conversation text available for audio.")
+        return
+
+    ensure_audio_cache_dir()
+
+    # Create a unique hash for the entire conversation for caching the final combined audio
+    conversation_hash = hashlib.md5(conversation_text.encode('utf-8')).hexdigest()
+    safe_item_id = str(item_id).replace('-', '')
+    combined_audio_filename = f"conv_{conversation_hash}_{safe_item_id}.mp3"
+    combined_audio_cache_path = os.path.join(AUDIO_CACHE_DIR, combined_audio_filename)
+
+    button_label = "▶️ Play Conversation"
+    button_key = f"play_audio_conversation_{conversation_hash}_{safe_item_id}"
+
+    if st.button(button_label, key=button_key):
+        if os.path.exists(combined_audio_cache_path):
+            logger.info(f"Playing cached combined conversation audio: {combined_audio_cache_path}")
+            st.audio(combined_audio_cache_path, format='audio/mp3')
+        else:
+            logger.info(f"Generating combined conversation audio for item ID: {item_id}")
+            
+            lines = conversation_text.strip().split('\n')
+            segments = []
+            
+            # Speaker detection logic - assumes prefixes like "女：" or "男："
+            # This can be made more robust based on actual LLM output format.
+            default_voice = DEFAULT_ELEVENLABS_VOICE_ID_A # Fallback voice
+
+            for line in lines:
+                line_strip = line.strip()
+                if not line_strip:
+                    continue
+
+                text_to_speak = line_strip
+                current_speaker_voice = default_voice # Default to voice A
+                speaker_log_prefix = "DefaultSpeaker"
+
+                if line_strip.startswith("女："):
+                    current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A
+                    text_to_speak = line_strip.replace("女：", "", 1).strip()
+                    speaker_log_prefix = "女"
+                elif line_strip.startswith("男："):
+                    current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_B
+                    text_to_speak = line_strip.replace("男：", "", 1).strip()
+                    speaker_log_prefix = "男"
+                # Add more speaker detection rules if needed, e.g., for Speaker A:, Speaker B:
+                # elif line_strip.startswith("Speaker A:"):
+                #     current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A
+                #     text_to_speak = line_strip.replace("Speaker A:", "", 1).strip()
+                #     speaker_log_prefix = "SpeakerA"
+                # elif line_strip.startswith("Speaker B:"):
+                #     current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_B
+                #     text_to_speak = line_strip.replace("Speaker B:", "", 1).strip()
+                #     speaker_log_prefix = "SpeakerB"
+
+                if not text_to_speak: # Skip if removing prefix results in empty string
+                    continue
+
+                segment_hash = hashlib.md5(text_to_speak.encode('utf-8')).hexdigest()
+                # Use a more descriptive segment filename for easier debugging if needed
+                segment_filename = f"seg_{conversation_hash}_{safe_item_id}_{speaker_log_prefix}_{segment_hash[:8]}.mp3"
+                
+                segment_path = generate_audio(text_to_speak, current_speaker_voice, segment_filename)
+                
+                if segment_path and os.path.exists(segment_path):
+                    try:
+                        audio_segment = AudioSegment.from_mp3(segment_path)
+                        segments.append(audio_segment)
+                        logger.info(f"Generated segment for '{speaker_log_prefix}: {text_to_speak[:20]}...' using voice {current_speaker_voice}")
+                    except Exception as e:
+                        logger.error(f"Error loading segment {segment_path} with pydub: {e}")
+                else:
+                    logger.warning(f"Could not generate or find audio segment for: {text_to_speak}")
+
+            if segments:
+                try:
+                    # Add a short silence between segments if desired, e.g., AudioSegment.silent(duration=250) # 250ms
+                    # combined_audio = segments[0]
+                    # for seg in segments[1:]:
+                    #     combined_audio += AudioSegment.silent(duration=200) + seg # Add 200ms silence
+                    combined_audio = sum(segments) # Direct concatenation
+                    
+                    combined_audio.export(combined_audio_cache_path, format="mp3")
+                    logger.info(f"Successfully combined and cached conversation audio: {combined_audio_cache_path}")
+                    st.audio(combined_audio_cache_path, format='audio/mp3')
+                except Exception as e:
+                    logger.error(f"Error combining or exporting conversation audio: {e}")
+                    st.error("Could not generate combined conversation audio.")
+            else:
+                st.warning("No audio segments were generated for the conversation.")
+
+# --- Audio Playback Helper --- (Original play_audio_for_text remains below this new function)
 def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, unique_prefix: str = "item"):
     """
     Generates (if needed) and plays audio for the given text_content.
@@ -37,7 +141,7 @@ def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, u
     else:
         safe_item_id = str(item_id).replace('-', '') 
     safe_text_type_label = text_type_label.replace(' ', '_').lower()
-    audio_filename = f"{text_hash}_{safe_item_id}_{safe_text_type_label}.wav"
+    audio_filename = f"{text_hash}_{safe_item_id}_{safe_text_type_label}.mp3"
     audio_cache_path = os.path.join(AUDIO_CACHE_DIR, audio_filename)
     
     button_label = f"▶️ Play {text_type_label.replace('_', ' ').title()}"
@@ -47,16 +151,16 @@ def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, u
     if st.button(button_label, key=button_key):
         if os.path.exists(audio_cache_path):
             logger.info(f"Playing cached audio: {audio_cache_path}")
-            st.audio(audio_cache_path)
+            st.audio(audio_cache_path, format='audio/mp3')
         else:
             logger.info(f"Generating audio for '{text_type_label}' (Not found in cache: {audio_cache_path})")
             # Using 'JP' as speaker_id, assuming this is the desired default Japanese speaker from MeloTTS config
-            generated_path = generate_audio(text_content, "JP", audio_filename) 
+            generated_path = generate_audio(text_content, DEFAULT_ELEVENLABS_VOICE_ID_A, audio_filename) # Use Voice A for narrator/single voice parts 
             if generated_path:
-                st.audio(generated_path)
+                st.audio(generated_path, format='audio/mp3')
                 logger.info(f"Successfully generated and played audio: {generated_path}")
             else:
-                st.error(f"Could not generate audio for {text_type_label.replace('_', ' ').title()}. Check MeloTTS server.")
+                st.error(f"Could not generate audio for {text_type_label.replace('_', ' ').title()}. Check ElevenLabs API key and connection.")
                 logger.error(f"Audio generation failed for text: '{text_content[:50]}...' (filename: {audio_filename})")
 
 # Page config
@@ -411,7 +515,7 @@ def render_question(question: Dict):
         conversation_lines = [line.strip() for line in conversation_text.split('\n') if line.strip()]
         formatted_conversation = '\n'.join(conversation_lines)
         st.text(formatted_conversation)  # Use st.text to preserve newlines
-        play_audio_for_text(conversation_text, "Conversation", question['id'])
+        play_conversation_audio(conversation_text, question['id']) # Use new function for conversation
         st.write(f"**Question:** {actual_question_text}")
         play_audio_for_text(actual_question_text, "Question Text", question['id'])
     elif actual_question_text: # Fallback if only question text is available

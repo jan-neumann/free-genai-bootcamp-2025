@@ -2,5 +2,7 @@ chromadb
 streamlit
 boto3
 youtube-transcript-api
-python-dotenv
 groq
+elevenlabs
+python-dotenv
+pydub
