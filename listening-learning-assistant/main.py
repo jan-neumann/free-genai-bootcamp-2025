@@ -7,6 +7,57 @@ import os
 import uuid
 from backend.groq_chat import GroqChat
 from backend.get_transcript import YouTubeTranscriptDownloader
+from backend.audio_generator import generate_audio, AUDIO_CACHE_DIR, ensure_audio_cache_dir
+import hashlib
+import logging # Added import
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Audio Playback Helper ---
+def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, unique_prefix: str = "item"):
+    """
+    Generates (if needed) and plays audio for the given text_content.
+    Uses a simple caching mechanism based on the hash of the text.
+    """
+    if not text_content:
+        # Using st.caption for a less intrusive message if no text is available
+        st.caption(f"No text available for {text_type_label.replace('_', ' ').title()} audio.")
+        return
+
+    ensure_audio_cache_dir() # Make sure cache directory exists
+
+    text_hash = hashlib.md5(text_content.encode('utf-8')).hexdigest()
+    # Ensure item_id is a string and clean it for filename compatibility
+    # If item_id is None (e.g. from older history items), use a part of the text_hash as a fallback
+    if item_id is None:
+        safe_item_id = text_hash[:8] # Use first 8 chars of content hash as fallback ID
+        logger.warning(f"Missing 'id' for audio item with label '{text_type_label}'. Using hash prefix '{safe_item_id}' as fallback ID.")
+    else:
+        safe_item_id = str(item_id).replace('-', '') 
+    safe_text_type_label = text_type_label.replace(' ', '_').lower()
+    audio_filename = f"{text_hash}_{safe_item_id}_{safe_text_type_label}.wav"
+    audio_cache_path = os.path.join(AUDIO_CACHE_DIR, audio_filename)
+    
+    button_label = f"▶️ Play {text_type_label.replace('_', ' ').title()}"
+    # Ensure button key is unique and Streamlit-compatible
+    button_key = f"play_audio_{unique_prefix}_{text_hash}_{safe_item_id}_{safe_text_type_label}"
+
+    if st.button(button_label, key=button_key):
+        if os.path.exists(audio_cache_path):
+            logger.info(f"Playing cached audio: {audio_cache_path}")
+            st.audio(audio_cache_path)
+        else:
+            logger.info(f"Generating audio for '{text_type_label}' (Not found in cache: {audio_cache_path})")
+            # Using 'JP' as speaker_id, assuming this is the desired default Japanese speaker from MeloTTS config
+            generated_path = generate_audio(text_content, "JP", audio_filename) 
+            if generated_path:
+                st.audio(generated_path)
+                logger.info(f"Successfully generated and played audio: {generated_path}")
+            else:
+                st.error(f"Could not generate audio for {text_type_label.replace('_', ' ').title()}. Check MeloTTS server.")
+                logger.error(f"Audio generation failed for text: '{text_content[:50]}...' (filename: {audio_filename})")
 
 # Page config
 st.set_page_config(
@@ -20,8 +71,12 @@ if 'transcript' not in st.session_state:
     st.session_state.transcript = None
 if 'messages' not in st.session_state:
     st.session_state.messages = []
-# Path for storing question history
-HISTORY_FILE_PATH = "listening-learning-assistant/data/question_history.json"
+# --- Global Variables & Constants ---
+HISTORY_FILE_PATH = os.getenv("HISTORY_FILE_PATH", "listening_learning_assistant/data/history.json")
+
+def generate_unique_id():
+    """Generates a unique ID for questions."""
+    return str(uuid.uuid4())
 
 if 'generated_questions_history' not in st.session_state:
     st.session_state.generated_questions_history = [] # Will be populated by load_question_history()
@@ -192,8 +247,6 @@ def process_message(message: str):
             st.markdown(formatted_response, unsafe_allow_html=True)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-
-
 def count_characters(text):
     """Count Japanese and total characters in text"""
     if not text:
@@ -340,7 +393,9 @@ if 'user_answer' not in st.session_state:
 if 'show_feedback' not in st.session_state:
     st.session_state.show_feedback = False
 
-def render_question(question):
+def render_question(question: Dict):
+    logger.debug(f"render_question: received question: {question}")
+    logger.debug(f"render_question: received question keys: {list(question.keys()) if isinstance(question, dict) else 'Not a dict'}")
     """Render a question with options"""
     intro_text = question.get('introduction', '')
     conversation_text = question.get('conversation', '')
@@ -350,15 +405,19 @@ def render_question(question):
         st.subheader("Listening Practice")
         if intro_text:
             st.write(f"**Situation:** {intro_text}")
+            play_audio_for_text(intro_text, "Introduction", question['id'])
         st.write("**Dialogue:**")
         # Process conversation lines to ensure newlines are respected
         conversation_lines = [line.strip() for line in conversation_text.split('\n') if line.strip()]
         formatted_conversation = '\n'.join(conversation_lines)
         st.text(formatted_conversation)  # Use st.text to preserve newlines
+        play_audio_for_text(conversation_text, "Conversation", question['id'])
         st.write(f"**Question:** {actual_question_text}")
+        play_audio_for_text(actual_question_text, "Question Text", question['id'])
     elif actual_question_text: # Fallback if only question text is available
         st.subheader("Question")
         st.write(actual_question_text)
+        play_audio_for_text(actual_question_text, "Question Text", question['id'])
     else:
         st.warning("Question data is not in the expected format.")
         return None
@@ -426,15 +485,6 @@ def render_feedback(question, user_answer, question_type, topic=None):
         with st.expander("Debug: Raw Response"):
             st.text(question['raw_response'])
     
-    # Add a button to try another question with unique key
-    if st.button("Next Question", key="next_question_btn"):
-        # Clear the current question and feedback state
-        st.session_state.current_question = None
-        st.session_state.user_answer = None
-        st.session_state.show_feedback = False
-        # Generate a new question
-        generate_new_question(question_type, topic)
-        st.rerun()
 
 def generate_new_question(question_type, topic=None):
     """Generate a new question and update session state"""
@@ -459,6 +509,9 @@ def generate_new_question(question_type, topic=None):
                 question['question_id'] = str(uuid.uuid4())
                 question['answered_in_main_ui'] = False
                 
+                question['id'] = generate_unique_id() # Ensure new questions have an ID
+                logger.debug(f"generate_new_question: question_data after adding id: {question}")
+                logger.debug(f"generate_new_question: question keys after adding id: {list(question.keys()) if isinstance(question, dict) else 'Not a dict'}")
                 st.session_state.current_question = question
                 # Store in history
                 if 'generated_questions_history' not in st.session_state: # Defensive initialization
@@ -500,14 +553,19 @@ def render_question_history_sidebar():
                 # Use an expander for each question to show more details
                 with st.expander(f"Q{len(st.session_state.generated_questions_history) - i}: {display_text}"):
                     st.markdown(f"**Introduction:** {q_item.get('introduction', 'N/A')}")
-                    st.markdown(f"**Conversation:**")
-                    # Conversation text from LLM often has '\\n', split by that and join with actual newline for display
-                    conversation_lines = [line.strip() for line in q_item.get('conversation', '').split('\\n') if line.strip()]
-                    formatted_conversation = '\n'.join(conversation_lines)
-                    st.text(formatted_conversation) # Use st.text to preserve newlines
+                    play_audio_for_text(q_item.get('introduction'), "Introduction", q_item.get('id'), unique_prefix=f"hist_{i}")
+                    
+                    st.markdown("**Conversation:**")
+                    conversation_text_hist = q_item.get('conversation', '')
+                    if isinstance(conversation_text_hist, list):
+                        conversation_text_hist = "\n".join(conversation_text_hist)
+                    st.markdown(f"```\n{conversation_text_hist}\n```")
+                    play_audio_for_text(conversation_text_hist, "Conversation", q_item.get('id'), unique_prefix=f"hist_{i}")
+                    
                     st.markdown(f"**Question:** {question_text}")
+                    play_audio_for_text(question_text, "Question Text", q_item.get('id'), unique_prefix=f"hist_{i}")
                     options = q_item.get('options', [])
-                    correct_idx = q_item.get('correct_answer', -1)
+                    correct_idx = q_item.get('correct_answer', -1)  # Or 'correct_answer_index' if that's the key
                     if options:
                         st.markdown("**Options:**")
                         question_answered = q_item.get('answered_in_main_ui', False)
