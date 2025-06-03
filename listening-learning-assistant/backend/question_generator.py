@@ -152,13 +152,29 @@ class QuestionGenerator:
             json_str_to_parse = re.sub(r'\s*```$', '', json_str_to_parse)
             json_str_to_parse = json_str_to_parse.strip()
 
+            # If after stripping tags, it doesn't start with '{', try to find the first '{'
+            if not json_str_to_parse.startswith('{'):
+                first_brace = json_str_to_parse.find('{')
+                if first_brace != -1:
+                    logging.info(f"QGEN: JSON string did not start with '{{'. Stripping leading content up to first '{{'. Original start: '{json_str_to_parse[:50]}...'" )
+                    json_str_to_parse = json_str_to_parse[first_brace:]
+                else:
+                    logging.error(f"QGEN: No '{{' found in json_str_to_parse after tag stripping. Content: {json_str_to_parse}")
+                    # Fall through, json.loads will likely fail and be caught
+
             # Heuristic: If the string starts with '{' and doesn't end with '}',
             # and isn't just an empty opening brace, try appending '}'
             if json_str_to_parse.startswith('{') and not json_str_to_parse.endswith('}') and len(json_str_to_parse.strip()) > 1:
-                logging.info("Attempting to fix potentially truncated JSON by appending '}'.")
-                json_str_to_parse += '}'
+                # Also try to find the last '}' in case of trailing garbage
+                last_brace = json_str_to_parse.rfind('}')
+                if last_brace != -1 and last_brace > json_str_to_parse.find('{'): # Ensure last brace is after first brace
+                    json_str_to_parse = json_str_to_parse[:last_brace+1]
+                    logging.info(f"QGEN: Attempting to fix potentially truncated/extended JSON by trimming to last '}}'. Result: '{json_str_to_parse[:50]}...{json_str_to_parse[-50:]}'")
+                else:
+                    logging.info("QGEN: Attempting to fix potentially truncated JSON by appending '}'.")
+                    json_str_to_parse += '}'
 
-            logging.info(f"Attempting to parse: '{json_str_to_parse}'")
+            logging.info(f"QGEN: Attempting to parse final JSON string: '{json_str_to_parse}'")
             # Attempt to parse the (potentially cleaned) JSON string
             data = json.loads(json_str_to_parse)
             
@@ -245,20 +261,25 @@ class QuestionGenerator:
             
             cleaned_options = [self._clean_text(str(opt)) for opt in options_raw] # Ensure opt is str before cleaning
 
-            correct_letter = parsed_data_dict.get('correct_answer_letter', 'A').upper()
-            correct_idx = 0 # Default to 0 (A)
-            if 'A' <= correct_letter <= 'D':
-                correct_idx = ord(correct_letter) - ord('A')
-            else:
-                logging.warning(f"Invalid 'correct_answer_letter' received: '{correct_letter}'. Defaulting to A (index 0).")
-                correct_idx = 0 # Explicitly set default if invalid
+            raw_letter_from_parsed = parsed_data_dict.get('correct_answer_letter', '')
+            logging.info(f"QGEN: Raw correct_answer_letter from parsed_data_dict: '{raw_letter_from_parsed}' (type: {type(raw_letter_from_parsed).__name__})")
 
-            # Store the text of the correct answer before shuffling
-            if 0 <= correct_idx < len(cleaned_options):
-                correct_answer_text = cleaned_options[correct_idx]
+            cleaned_correct_answer_letter = self._clean_text(raw_letter_from_parsed).upper()
+            logging.info(f"QGEN: correct_answer_letter after _clean_text and .upper(): '{cleaned_correct_answer_letter}'")
+
+            # Validate correct_answer_letter again after cleaning
+            if cleaned_correct_answer_letter not in ['A', 'B', 'C', 'D']:
+                logging.warning(f"QGEN: Cleaned correct_answer_letter '{cleaned_correct_answer_letter}' is invalid. Setting to empty string.")
+                cleaned_correct_answer_letter = ""
+        
+            logging.info(f"QGEN: Final cleaned_correct_answer_letter before putting in dict: '{cleaned_correct_answer_letter}'")
+
+            # Ensure options are a list of strings
+            if 0 <= ord(cleaned_correct_answer_letter) - ord('A') < len(cleaned_options):
+                correct_answer_text = cleaned_options[ord(cleaned_correct_answer_letter) - ord('A')]
             else:
                 # Fallback if correct_idx is somehow out of bounds (shouldn't happen with current logic)
-                logging.warning(f"Initial correct_idx {correct_idx} out of bounds for options length {len(cleaned_options)}. Defaulting to first option as correct.")
+                logging.warning(f"Initial correct_idx out of bounds for options length {len(cleaned_options)}. Defaulting to first option as correct.")
                 correct_answer_text = cleaned_options[0] if cleaned_options else ""
                 correct_idx = 0
 
@@ -273,15 +294,18 @@ class QuestionGenerator:
                 logging.error(f"Correct answer text '{correct_answer_text}' not found in shuffled options. Defaulting to 0.")
                 final_correct_idx = 0
 
-            return {
+            final_data = {
                 'introduction': intro,
                 'conversation': conversation_cleaned,
                 'question': question_text,
-                'options': cleaned_options,
-                'correct_answer': final_correct_idx,
+                'options': cleaned_options, 
+                'correct_answer_letter': cleaned_correct_answer_letter, # Ensure this is included!
+                'correct_answer': final_correct_idx, # This is the index, keep for compatibility if used elsewhere
                 'explanation': "", # Placeholder for now
-                'raw_response': raw_response_content
+                'raw_response': raw_response_content  # Include the raw response for debugging
             }
+            logging.info(f"QGEN: Returning final_data with correct_answer_letter: '{final_data.get('correct_answer_letter')}' and correct_answer_index: {final_data.get('correct_answer')}")
+            return final_data
         except Exception as e:
             logging.error(f"Error processing parsed data into final dictionary: {type(e).__name__} - {str(e)}")
             # import traceback # Uncomment for detailed stack trace

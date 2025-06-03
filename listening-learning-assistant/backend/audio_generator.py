@@ -12,9 +12,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 AUDIO_CACHE_DIR = "listening-learning-assistant/data/audio_cache"
-DEFAULT_ELEVENLABS_VOICE_ID_A = "JBFqnCBsd6RMkjVDRZzb" # Example voice for Speaker A
-DEFAULT_ELEVENLABS_VOICE_ID_B = "sB1b5zUrxQVAFl2PhZFp" # Placeholder for Speaker B - USER SHOULD UPDATE with a different voice ID
-                                                 # User should verify/select a preferred Japanese voice
+DEFAULT_ELEVENLABS_VOICE_ID_A = "JBFqnCBsd6RMkjVDRZzb" 
+DEFAULT_ELEVENLABS_VOICE_ID_B = "sB1b5zUrxQVAFl2PhZFp"
 DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5"
 
 def ensure_audio_cache_dir():

@@ -24,100 +24,313 @@ logger = logging.getLogger(__name__)
 
 def play_conversation_audio(conversation_text: str, item_id: str):
     """
-    Generates (if needed) and plays audio for the conversation.
-    Assigns different voices to different speakers and concatenates audio segments.
+    Provides a button to play the full multi-voice conversation audio.
+    Audio is generated and cached if not already available.
     """
     if not conversation_text:
         st.caption("No conversation text available for audio.")
         return
 
+    # Create a unique hash for the button key based on conversation content and item_id
+    conversation_hash = hashlib.md5(conversation_text.encode('utf-8')).hexdigest()
+    safe_item_id = str(item_id).replace('-', '')
+    button_label = "▶️ Play Conversation"
+    button_key = f"play_audio_conversation_{conversation_hash}_{safe_item_id}"
+
+    if st.button(button_label, key=button_key):
+        # Call the helper function to get/generate the combined conversation audio path
+        combined_audio_path = get_or_generate_conversation_audio_path(conversation_text, item_id)
+        if combined_audio_path:
+            st.audio(combined_audio_path, format='audio/mp3')
+            logger.info(f"Playing combined conversation audio: {combined_audio_path}")
+        else:
+            st.error("Could not generate or find combined conversation audio.")
+            logger.error(f"Failed to get/generate conversation audio for item ID: {item_id}")
+
+# --- Conversation Audio Generation/Retrieval Helper ---
+def get_or_generate_conversation_audio_path(conversation_text: str, item_id: str) -> str | None:
+    """
+    Generates (if needed) and caches the full multi-voice conversation audio.
+    Returns the path to the combined audio file, or None on failure.
+    """
+    if not conversation_text:
+        logger.warning(f"No conversation text provided for conversation audio generation: item {item_id}")
+        return None
+
     ensure_audio_cache_dir()
 
-    # Create a unique hash for the entire conversation for caching the final combined audio
     conversation_hash = hashlib.md5(conversation_text.encode('utf-8')).hexdigest()
     safe_item_id = str(item_id).replace('-', '')
     combined_audio_filename = f"conv_{conversation_hash}_{safe_item_id}.mp3"
     combined_audio_cache_path = os.path.join(AUDIO_CACHE_DIR, combined_audio_filename)
 
-    button_label = "▶️ Play Conversation"
-    button_key = f"play_audio_conversation_{conversation_hash}_{safe_item_id}"
+    if os.path.exists(combined_audio_cache_path):
+        logger.info(f"Using cached combined conversation audio: {combined_audio_cache_path}")
+        return combined_audio_cache_path
+    else:
+        logger.info(f"Generating combined conversation audio for item ID: {item_id} (Not found in cache: {combined_audio_cache_path})")
+        lines = conversation_text.strip().split('\n')
+        segments = []
+        default_voice = DEFAULT_ELEVENLABS_VOICE_ID_A # Fallback voice
+
+        for i, line in enumerate(lines):
+            line_strip = line.strip()
+            if not line_strip:
+                continue
+
+            text_to_speak = line_strip
+            current_speaker_voice = default_voice
+            speaker_log_prefix = "DefaultSpeaker"
+            # Use a more specific label for conversation segments for clarity in caching/logging
+            segment_text_type_label = f"conversation_segment_{i}" 
+
+            # For now, use Voice A for all speakers to avoid voice limit issues
+            current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A 
+            speaker_log_prefix = "Speaker"
+
+            if line_strip.startswith("女："):
+                # current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_B # Female voice (Temporarily disabled)
+                text_to_speak = line_strip.replace("女：", "", 1).strip()
+                speaker_log_prefix = "女"
+            elif line_strip.startswith("男："):
+                # current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A # Male voice (Already set as default for now)
+                text_to_speak = line_strip.replace("男：", "", 1).strip()
+                speaker_log_prefix = "男"
+            else: # Handle lines without speaker prefixes, if any, using default voice
+                text_to_speak = line_strip
+            
+            if not text_to_speak:
+                continue
+
+            # Use get_or_generate_audio_path for individual segments
+            # Unique prefix for segments to distinguish from other audio types for the same item_id
+            segment_unique_prefix = f"conv_seg_{speaker_log_prefix}_{i}" # Ensure unique prefix per segment
+            segment_path = get_or_generate_audio_path(text_to_speak, current_speaker_voice, segment_text_type_label, item_id, unique_prefix=segment_unique_prefix)
+            
+            if segment_path and os.path.exists(segment_path):
+                try:
+                    audio_segment = AudioSegment.from_mp3(segment_path)
+                    segments.append(audio_segment)
+                    logger.info(f"Loaded segment for '{speaker_log_prefix}: {text_to_speak[:20]}...' using voice {current_speaker_voice}")
+                except Exception as e:
+                    logger.error(f"Error loading segment {segment_path} with pydub: {e}")
+            else:
+                logger.warning(f"Could not generate or find audio segment for: {text_to_speak}")
+
+        if segments:
+            try:
+                combined_audio = sum(segments)
+                combined_audio.export(combined_audio_cache_path, format="mp3")
+                logger.info(f"Successfully combined and cached conversation audio: {combined_audio_cache_path}")
+                return combined_audio_cache_path
+            except Exception as e:
+                logger.error(f"Error combining or exporting conversation audio: {e}")
+                return None
+        else:
+            logger.warning("No audio segments were generated for the conversation.")
+            return None
+
+# --- Comprehensive Audio Helper ---
+def generate_and_play_comprehensive_audio(question_data: dict, item_id: str):
+    """
+    Generates a single audio file combining intro, conversation, question, ping, and answer.
+    Provides a button to play this comprehensive audio.
+    """
+    if not question_data:
+        st.caption("No question data available for comprehensive audio.")
+        return
+
+    ensure_audio_cache_dir()
+
+    # Create a unique hash for the comprehensive audio based on all its text parts
+    # This ensures that if any part changes, a new comprehensive audio is generated.
+    intro_text = question_data.get('introduction', '')
+    conversation_text = question_data.get('conversation', '')
+    question_text = question_data.get('question', '')
+    correct_answer_text = question_data.get('correct_answer_letter', '') # Assuming this is the text to speak for the answer
+    # If correct_answer_letter is 'A', 'B', etc., you might want to map it to the full option text
+    # For now, let's assume it's 'A', 'B', 'C', or 'D' and we'll speak that letter.
+    # If it's the full answer text, that's even better.
+    # We need to clarify what 'correct_answer_letter' actually holds. For now, we'll use it directly.
+    # If 'correct_answer_letter' gives 'A', and options are {'A': 'Apple', ...}, we might want to speak 'Apple'.
+    # Let's assume 'correct_answer_letter' is the text to be spoken for the answer for now.
+
+    all_text_content_for_hash = f"{intro_text}{conversation_text}{question_text}{correct_answer_text}"
+    comprehensive_audio_hash = hashlib.md5(all_text_content_for_hash.encode('utf-8')).hexdigest()
+    safe_item_id = str(item_id).replace('-', '')
+    comprehensive_filename = f"comp_{comprehensive_audio_hash}_{safe_item_id}.mp3"
+    comprehensive_cache_path = os.path.join(AUDIO_CACHE_DIR, comprehensive_filename)
+
+    button_label = "▶️ Play Full Listening Exercise"
+    button_key = f"play_comprehensive_audio_{comprehensive_audio_hash}_{safe_item_id}"
 
     if st.button(button_label, key=button_key):
-        if os.path.exists(combined_audio_cache_path):
-            logger.info(f"Playing cached combined conversation audio: {combined_audio_cache_path}")
-            st.audio(combined_audio_cache_path, format='audio/mp3')
-        else:
-            logger.info(f"Generating combined conversation audio for item ID: {item_id}")
-            
-            lines = conversation_text.strip().split('\n')
-            segments = []
-            
-            # Speaker detection logic - assumes prefixes like "女：" or "男："
-            # This can be made more robust based on actual LLM output format.
-            default_voice = DEFAULT_ELEVENLABS_VOICE_ID_A # Fallback voice
+        if os.path.exists(comprehensive_cache_path):
+            logger.info(f"Playing cached comprehensive audio: {comprehensive_cache_path}")
+            st.audio(comprehensive_cache_path, format='audio/mp3')
+            return
 
-            for line in lines:
-                line_strip = line.strip()
-                if not line_strip:
-                    continue
+        logger.info(f"Generating comprehensive audio for item ID: {item_id} (Not found in cache: {comprehensive_cache_path})")
+        
+        audio_segments = []
+        valid_paths = True
 
-                text_to_speak = line_strip
-                current_speaker_voice = default_voice # Default to voice A
-                speaker_log_prefix = "DefaultSpeaker"
+        # 1. Introduction
+        if intro_text:
+            intro_path = get_or_generate_audio_path(intro_text, DEFAULT_ELEVENLABS_VOICE_ID_A, "Introduction", item_id, "comp_intro")
+            if intro_path:
+                audio_segments.append(AudioSegment.from_mp3(intro_path))
+                audio_segments.append(AudioSegment.silent(duration=750)) # Pause after intro
+            else: valid_paths = False
 
-                if line_strip.startswith("女："):
-                    current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A
-                    text_to_speak = line_strip.replace("女：", "", 1).strip()
-                    speaker_log_prefix = "女"
-                elif line_strip.startswith("男："):
-                    current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_B
-                    text_to_speak = line_strip.replace("男：", "", 1).strip()
-                    speaker_log_prefix = "男"
-                # Add more speaker detection rules if needed, e.g., for Speaker A:, Speaker B:
-                # elif line_strip.startswith("Speaker A:"):
-                #     current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_A
-                #     text_to_speak = line_strip.replace("Speaker A:", "", 1).strip()
-                #     speaker_log_prefix = "SpeakerA"
-                # elif line_strip.startswith("Speaker B:"):
-                #     current_speaker_voice = DEFAULT_ELEVENLABS_VOICE_ID_B
-                #     text_to_speak = line_strip.replace("Speaker B:", "", 1).strip()
-                #     speaker_log_prefix = "SpeakerB"
+        # 2. Conversation
+        if valid_paths and conversation_text:
+            convo_path = get_or_generate_conversation_audio_path(conversation_text, item_id)
+            if convo_path:
+                audio_segments.append(AudioSegment.from_mp3(convo_path))
+                audio_segments.append(AudioSegment.silent(duration=750)) # Pause after conversation
+            else: valid_paths = False
 
-                if not text_to_speak: # Skip if removing prefix results in empty string
-                    continue
+        # 3. Question
+        if valid_paths and question_text:
+            question_path = get_or_generate_audio_path(question_text, DEFAULT_ELEVENLABS_VOICE_ID_A, "Question", item_id, "comp_question")
+            if question_path:
+                audio_segments.append(AudioSegment.from_mp3(question_path))
+                audio_segments.append(AudioSegment.silent(duration=750)) # Pause after question
+            else: valid_paths = False
+        
+        # 4. Ping Sound
+        if valid_paths:
+            ping_path = get_ping_sound_path()
+            if ping_path: 
+                audio_segments.append(AudioSegment.from_mp3(ping_path))
+                audio_segments.append(AudioSegment.silent(duration=750)) # Pause after ping
+            else: valid_paths = False
 
-                segment_hash = hashlib.md5(text_to_speak.encode('utf-8')).hexdigest()
-                # Use a more descriptive segment filename for easier debugging if needed
-                segment_filename = f"seg_{conversation_hash}_{safe_item_id}_{speaker_log_prefix}_{segment_hash[:8]}.mp3"
-                
-                segment_path = generate_audio(text_to_speak, current_speaker_voice, segment_filename)
-                
-                if segment_path and os.path.exists(segment_path):
-                    try:
-                        audio_segment = AudioSegment.from_mp3(segment_path)
-                        segments.append(audio_segment)
-                        logger.info(f"Generated segment for '{speaker_log_prefix}: {text_to_speak[:20]}...' using voice {current_speaker_voice}")
-                    except Exception as e:
-                        logger.error(f"Error loading segment {segment_path} with pydub: {e}")
-                else:
-                    logger.warning(f"Could not generate or find audio segment for: {text_to_speak}")
+        # 5. Correct Answer
+        actual_answer_to_speak = ""
 
-            if segments:
+        options_list = question_data.get('options') # This is a list of strings
+        correct_answer_letter = question_data.get('correct_answer_letter', '').strip().upper()
+        correct_answer_index = question_data.get('correct_answer') # This is an integer index
+
+        logger.info(f"Comprehensive Audio: Raw correct_answer_letter: '{correct_answer_letter}', Raw correct_answer_index: {correct_answer_index}")
+        logger.info(f"Comprehensive Audio: Options list: {options_list}")
+
+        actual_answer_to_speak = None
+        if isinstance(options_list, list) and options_list:
+            if correct_answer_index is not None and 0 <= correct_answer_index < len(options_list):
+                actual_answer_to_speak = options_list[correct_answer_index]
+                logger.info(f"Comprehensive Audio: Fetched answer text using correct_answer_index ({correct_answer_index}): '{actual_answer_to_speak}'")
+            elif correct_answer_letter and 'A' <= correct_answer_letter <= 'D':
+                # Fallback to deriving index from letter if correct_answer_index is missing/invalid
                 try:
-                    # Add a short silence between segments if desired, e.g., AudioSegment.silent(duration=250) # 250ms
-                    # combined_audio = segments[0]
-                    # for seg in segments[1:]:
-                    #     combined_audio += AudioSegment.silent(duration=200) + seg # Add 200ms silence
-                    combined_audio = sum(segments) # Direct concatenation
-                    
-                    combined_audio.export(combined_audio_cache_path, format="mp3")
-                    logger.info(f"Successfully combined and cached conversation audio: {combined_audio_cache_path}")
-                    st.audio(combined_audio_cache_path, format='audio/mp3')
-                except Exception as e:
-                    logger.error(f"Error combining or exporting conversation audio: {e}")
-                    st.error("Could not generate combined conversation audio.")
+                    letter_to_index = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
+                    idx = letter_to_index[correct_answer_letter]
+                    if 0 <= idx < len(options_list):
+                        actual_answer_to_speak = options_list[idx]
+                        logger.info(f"Comprehensive Audio: Fetched answer text using correct_answer_letter '{correct_answer_letter}' (index {idx}): '{actual_answer_to_speak}'")
+                    else:
+                        logger.warning(f"Comprehensive Audio: Derived index {idx} from letter '{correct_answer_letter}' is out of bounds for options list.")
+                except KeyError:
+                    logger.warning(f"Comprehensive Audio: Could not derive a valid index from correct_answer_letter '{correct_answer_letter}'.")
             else:
-                st.warning("No audio segments were generated for the conversation.")
+                logger.warning("Comprehensive Audio: Options list is present, but couldn't determine correct answer text from index or letter.")
+        
+        if not actual_answer_to_speak and correct_answer_letter: # Ultimate fallback to speak letter if text not found
+             logger.warning(f"Comprehensive Audio: Could not determine full answer text. Falling back to speaking the letter: '{correct_answer_letter}'")
+             actual_answer_to_speak = correct_answer_letter
+        elif not actual_answer_to_speak:
+            logger.warning("Comprehensive Audio: correct_answer_letter is empty or no answer text could be determined.")
+
+        if valid_paths and actual_answer_to_speak:
+            logger.info(f"Comprehensive Audio: Attempting to generate audio for answer: '{actual_answer_to_speak}'")
+            answer_path = get_or_generate_audio_path(actual_answer_to_speak, DEFAULT_ELEVENLABS_VOICE_ID_A, "Correct Answer", item_id, "comp_answer")
+            if answer_path:
+                logger.info(f"Comprehensive Audio: Generated answer audio path: {answer_path}")
+                audio_segments.append(AudioSegment.from_mp3(answer_path))
+            else:
+                logger.error(f"Comprehensive Audio: Failed to generate audio for answer: '{actual_answer_to_speak}'")
+                valid_paths = False
+        elif not actual_answer_to_speak:
+             logger.warning("Comprehensive Audio: No actual_answer_to_speak determined, skipping answer audio.")
+        elif not valid_paths:
+            logger.warning("Comprehensive Audio: valid_paths is False prior to answer, skipping answer audio generation.")
+
+        if audio_segments and valid_paths:
+            try:
+                final_audio = sum(audio_segments)
+                final_audio.export(comprehensive_cache_path, format="mp3")
+                logger.info(f"Successfully generated and cached comprehensive audio: {comprehensive_cache_path}")
+                st.audio(comprehensive_cache_path, format='audio/mp3')
+            except Exception as e:
+                logger.error(f"Error combining or exporting comprehensive audio: {e}")
+                st.error("Could not generate comprehensive audio.")
+        elif not valid_paths:
+            st.error("Failed to generate one or more audio components for the comprehensive audio.")
+        else:
+            st.warning("No audio segments were available to create comprehensive audio.")
+
+# --- Ping Sound Helper ---
+from pydub.generators import Sine
+
+def get_ping_sound_path() -> str | None:
+    """
+    Ensures a ping sound file exists and returns its path.
+    Generates a simple sine wave if ping.mp3 is not found.
+    """
+    ensure_audio_cache_dir()
+    ping_filename = "ping.mp3"
+    ping_cache_path = os.path.join(AUDIO_CACHE_DIR, ping_filename)
+
+    if os.path.exists(ping_cache_path):
+        logger.info(f"Using existing ping sound: {ping_cache_path}")
+        return ping_cache_path
+    else:
+        logger.info(f"Generating ping sound: {ping_cache_path}")
+        try:
+            # Generate a 440 Hz (A4) sine wave for 0.5 seconds
+            ping_sound = Sine(440).to_audio_segment(duration=500, volume=-20) # volume in dBFS
+            # Add a short fade out to make it sound more like a ping
+            ping_sound = ping_sound.fade_out(150)
+            ping_sound.export(ping_cache_path, format="mp3")
+            logger.info(f"Successfully generated ping sound: {ping_cache_path}")
+            return ping_cache_path
+        except Exception as e:
+            logger.error(f"Could not generate ping sound: {e}")
+            return None
+
+# --- Audio Generation/Retrieval Helper ---
+def get_or_generate_audio_path(text_content: str, voice_id: str, text_type_label: str, item_id: str, unique_prefix: str = "item") -> str | None:
+    """
+    Ensures audio is generated and cached, then returns the path.
+    Returns None if generation fails or text_content is empty.
+    """
+    if not text_content:
+        logger.warning(f"No text content provided for audio generation: {text_type_label}, item {item_id}")
+        return None
+
+    ensure_audio_cache_dir()
+    
+    safe_item_id = str(item_id).replace('-', '') # Sanitize item_id for filename
+    # Create a hash based on text content and voice_id to ensure uniqueness for different voices on same text
+    text_and_voice_hash = hashlib.md5(f"{text_content}{voice_id}".encode('utf-8')).hexdigest()
+    audio_filename = f"{unique_prefix}_{text_type_label.lower().replace(' ', '_')}_{text_and_voice_hash}_{safe_item_id}.mp3"
+    audio_cache_path = os.path.join(AUDIO_CACHE_DIR, audio_filename)
+
+    if os.path.exists(audio_cache_path):
+        logger.info(f"Using cached audio for '{text_type_label}': {audio_cache_path}")
+        return audio_cache_path
+    else:
+        logger.info(f"Generating audio for '{text_type_label}' (Not found in cache: {audio_cache_path}) with voice {voice_id}")
+        # generate_audio is imported from backend.audio_generator
+        generated_path = generate_audio(text_content, voice_id, audio_filename) 
+        if generated_path and os.path.exists(generated_path):
+            logger.info(f"Successfully generated audio: {generated_path}")
+            return generated_path
+        else:
+            logger.error(f"Failed to generate audio for '{text_type_label}': {text_content[:50]}...")
+            return None
 
 # --- Audio Playback Helper --- (Original play_audio_for_text remains below this new function)
 def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, unique_prefix: str = "item"):
@@ -130,38 +343,22 @@ def play_audio_for_text(text_content: str, text_type_label: str, item_id: str, u
         st.caption(f"No text available for {text_type_label.replace('_', ' ').title()} audio.")
         return
 
-    ensure_audio_cache_dir() # Make sure cache directory exists
-
-    text_hash = hashlib.md5(text_content.encode('utf-8')).hexdigest()
-    # Ensure item_id is a string and clean it for filename compatibility
-    # If item_id is None (e.g. from older history items), use a part of the text_hash as a fallback
-    if item_id is None:
-        safe_item_id = text_hash[:8] # Use first 8 chars of content hash as fallback ID
-        logger.warning(f"Missing 'id' for audio item with label '{text_type_label}'. Using hash prefix '{safe_item_id}' as fallback ID.")
-    else:
-        safe_item_id = str(item_id).replace('-', '') 
-    safe_text_type_label = text_type_label.replace(' ', '_').lower()
-    audio_filename = f"{text_hash}_{safe_item_id}_{safe_text_type_label}.mp3"
-    audio_cache_path = os.path.join(AUDIO_CACHE_DIR, audio_filename)
+    # Use DEFAULT_ELEVENLABS_VOICE_ID_A for single speaker parts like intro, question, answer
+    voice_id_to_use = DEFAULT_ELEVENLABS_VOICE_ID_A 
     
-    button_label = f"▶️ Play {text_type_label.replace('_', ' ').title()}"
-    # Ensure button key is unique and Streamlit-compatible
-    button_key = f"play_audio_{unique_prefix}_{text_hash}_{safe_item_id}_{safe_text_type_label}"
+    button_label = f"▶️ Play {text_type_label}"
+    # Create a unique key for the button based on content and type to avoid Streamlit duplicate key errors
+    button_key_hash_content = hashlib.md5(f"{text_content}{text_type_label}{item_id}{unique_prefix}{voice_id_to_use}".encode('utf-8')).hexdigest()
+    button_key = f"play_audio_{text_type_label.lower().replace(' ', '_')}_{button_key_hash_content}"
 
     if st.button(button_label, key=button_key):
-        if os.path.exists(audio_cache_path):
-            logger.info(f"Playing cached audio: {audio_cache_path}")
-            st.audio(audio_cache_path, format='audio/mp3')
+        # Call the helper function to get/generate the audio path
+        audio_path = get_or_generate_audio_path(text_content, voice_id_to_use, text_type_label, item_id, unique_prefix)
+        if audio_path:
+            st.audio(audio_path, format='audio/mp3')
+            logger.info(f"Playing audio for '{text_type_label}': {audio_path}")
         else:
-            logger.info(f"Generating audio for '{text_type_label}' (Not found in cache: {audio_cache_path})")
-            # Using 'JP' as speaker_id, assuming this is the desired default Japanese speaker from MeloTTS config
-            generated_path = generate_audio(text_content, DEFAULT_ELEVENLABS_VOICE_ID_A, audio_filename) # Use Voice A for narrator/single voice parts 
-            if generated_path:
-                st.audio(generated_path, format='audio/mp3')
-                logger.info(f"Successfully generated and played audio: {generated_path}")
-            else:
-                st.error(f"Could not generate audio for {text_type_label.replace('_', ' ').title()}. Check ElevenLabs API key and connection.")
-                logger.error(f"Audio generation failed for text: '{text_content[:50]}...' (filename: {audio_filename})")
+            st.error(f"Could not generate or find audio for {text_type_label}.")
 
 # Page config
 st.set_page_config(
@@ -518,10 +715,22 @@ def render_question(question: Dict):
         play_conversation_audio(conversation_text, question['id']) # Use new function for conversation
         st.write(f"**Question:** {actual_question_text}")
         play_audio_for_text(actual_question_text, "Question Text", question['id'])
+
+        # Add button for comprehensive audio playback
+        st.markdown("---") # Add a visual separator
+        generate_and_play_comprehensive_audio(question, question['id'])
+        st.markdown("---") # Add a visual separator
+
     elif actual_question_text: # Fallback if only question text is available
         st.subheader("Question")
         st.write(actual_question_text)
         play_audio_for_text(actual_question_text, "Question Text", question['id'])
+
+        # Add button for comprehensive audio playback (even if only question text is available)
+        st.markdown("---") # Add a visual separator
+        generate_and_play_comprehensive_audio(question, question['id'])
+        st.markdown("---") # Add a visual separator
+
     else:
         st.warning("Question data is not in the expected format.")
         return None
@@ -603,25 +812,33 @@ def generate_new_question(question_type, topic=None):
                 return
                 
             # Generate the question
-            question = question_generator.generate_question(
+            question_data = question_generator.generate_question(
                 question_type=question_type,
                 topic=topic if topic else None
             )
-            
-            if question:
+            logger.info(f"generate_new_question: Raw question_data from generator: {question_data}")
+            if not question_data or not isinstance(question_data, dict):
+                st.error("Failed to generate a valid question structure. Please try again.")
+                logger.error("generate_new_question: question_data from generator was None or not a dict.")
+                return # Exit early if question_data is not valid
+
+            logger.info(f"generate_new_question: Value of 'correct_answer_letter' from generator: '{question_data.get('correct_answer_letter')}'")
+            # The 'if question_data:' check is now implicitly handled by the block above, 
+            # but we keep it if further specific checks on a valid dict are needed.
+            if question_data:
                 # Add unique ID and answered status before storing
-                question['question_id'] = str(uuid.uuid4())
-                question['answered_in_main_ui'] = False
+                question_data['question_id'] = str(uuid.uuid4())
+                question_data['answered_in_main_ui'] = False
                 
-                question['id'] = generate_unique_id() # Ensure new questions have an ID
-                logger.debug(f"generate_new_question: question_data after adding id: {question}")
-                logger.debug(f"generate_new_question: question keys after adding id: {list(question.keys()) if isinstance(question, dict) else 'Not a dict'}")
-                st.session_state.current_question = question
+                question_data['id'] = generate_unique_id() # Ensure new questions have an ID
+                logger.debug(f"generate_new_question: question_data after adding id: {question_data}")
+                logger.debug(f"generate_new_question: question_data keys after adding id: {list(question_data.keys()) if isinstance(question_data, dict) else 'Not a dict'}")
+                st.session_state.current_question = question_data
                 # Store in history
                 if 'generated_questions_history' not in st.session_state: # Defensive initialization
                     st.session_state.generated_questions_history = []
-                st.session_state.generated_questions_history.append(question)
-                save_question_history() # Save after adding new question
+                st.session_state.generated_questions_history.insert(0, question_data) # Add to the beginning of the list
+                save_question_history() # Save after adding a new question
                 
                 st.session_state.user_answer = None
                 st.session_state.show_feedback = False
