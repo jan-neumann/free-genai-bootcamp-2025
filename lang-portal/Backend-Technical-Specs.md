@@ -135,6 +135,7 @@ We have the following tables:
 - POST /api/settings/full_reset
 - POST /api/study_sessions/:id/words/:word_id/review
     - required params: correct
+- GET /api/groups/:id/raw
 
 ## API Response Documentation
 
@@ -483,6 +484,23 @@ Returns words reviewed in the study session for the Study Session Show page.
     "total_items": 250,
     "items_per_page": 100
   }
+}
+```
+
+#### GET /api/groups/:id/raw
+Returns a collection of words in a json structure. It will have japanese words with their english translation.
+
+##### JSON Response
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "japanese": "食べる",
+      "romaji": "taberu",
+      "english": "to eat"
+    }
+  ]
 }
 ```
 

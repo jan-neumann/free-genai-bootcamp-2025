@@ -11,6 +11,7 @@ type WordRepositoryInterface interface {
 	Delete(id uint) error
 	GetStudyStats(wordID uint) (correctCount int64, wrongCount int64, err error)
 	GetWordsByGroup(groupID uint, params PaginationParams) (*PaginatedResult[models.Word], error)
+	GetWordsByGroupRaw(groupID uint) ([]models.Word, error)
 	GetTotalWordCount() (int64, error)
 	GetStudiedWordCount() (int64, error)
 	GetByJapanese(japanese string) (*models.Word, error)

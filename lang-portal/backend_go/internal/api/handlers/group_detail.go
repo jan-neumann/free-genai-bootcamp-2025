@@ -83,6 +83,39 @@ func (h *GroupDetailHandler) GetGroupWords(c *gin.Context) {
 	c.JSON(http.StatusOK, middleware.NewPaginatedResponse(items, int(total), params))
 }
 
+// GetGroupWordsRaw returns all words in a group in a simplified format
+func (h *GroupDetailHandler) GetGroupWordsRaw(c *gin.Context) {
+	groupID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		return
+	}
+
+	var words []struct {
+		ID       uint   `json:"id"`
+		Japanese string `json:"japanese"`
+		Romaji   string `json:"romaji"`
+		English  string `json:"english"`
+	}
+
+	// Get words through the word_groups join table
+	err = h.db.Model(&models.Word{}).
+		Select("words.id, words.japanese, words.romaji, words.english").
+		Joins("JOIN word_groups ON word_groups.word_id = words.id").
+		Where("word_groups.group_id = ?", groupID).
+		Order("words.japanese ASC").
+		Find(&words).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch words"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": words,
+	})
+}
+
 // GetGroupStudySessions returns all study sessions for a group
 func (h *GroupDetailHandler) GetGroupStudySessions(c *gin.Context) {
 	groupID, err := strconv.ParseUint(c.Param("id"), 10, 32)

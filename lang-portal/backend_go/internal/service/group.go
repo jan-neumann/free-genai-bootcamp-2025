@@ -29,6 +29,14 @@ type GroupDetail struct {
 	WordCount int    `json:"word_count"`
 }
 
+// GroupWordRaw represents a simplified word in a group (for raw endpoint)
+type GroupWordRaw struct {
+	ID       uint   `json:"id"`
+	Japanese string `json:"japanese"`
+	Romaji   string `json:"romaji"`
+	English  string `json:"english"`
+}
+
 // CreateGroup creates a new group
 func (s *GroupService) CreateGroup(group *models.Group) error {
 	// Check if group with same name exists
@@ -195,18 +203,40 @@ func (s *GroupService) GetGroupsByWord(wordID uint, params PaginationParams) (*P
 		PageSize: params.PageSize,
 	})
 	if err != nil {
-		return nil, NewServiceError(ErrCodeInternal, "Failed to get word groups", err)
+		return nil, NewServiceError(ErrCodeInternal, "Failed to get groups by word", err)
 	}
 
 	// Transform groups
 	groups := make([]Group, len(result.Items))
 	for i, g := range result.Items {
+		wordCount := int64(len(g.Words)) // Calculate word count from the Words relationship
 		groups[i] = Group{
 			ID:        g.ID,
 			Name:      g.Name,
-			WordCount: len(g.Words),
+			WordCount: int(wordCount),
 		}
 	}
 
 	return NewPaginatedResult(groups, result.TotalItems, params.Page, params.PageSize), nil
+}
+
+// GetWordsRaw retrieves a simplified list of words in a group (id, japanese, romaji, english only)
+func (s *GroupService) GetWordsRaw(groupID uint) ([]GroupWordRaw, error) {
+	words, err := s.wordRepo.GetWordsByGroupRaw(groupID)
+	if err != nil {
+		return nil, NewServiceError(ErrCodeInternal, "Failed to get group words", err)
+	}
+
+	// Transform to raw word format
+	rawWords := make([]GroupWordRaw, len(words))
+	for i, w := range words {
+		rawWords[i] = GroupWordRaw{
+			ID:       w.ID,
+			Japanese: w.Japanese,
+			Romaji:   w.Romaji,
+			English:  w.English,
+		}
+	}
+
+	return rawWords, nil
 }

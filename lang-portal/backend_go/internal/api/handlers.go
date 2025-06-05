@@ -191,6 +191,28 @@ func GetWordsByGroup(s *service.WordService) gin.HandlerFunc {
 
 // Group Handlers
 
+// GetGroupWordsRaw returns a simplified list of words in a group (id, japanese, romaji, english only)
+func GetGroupWordsRaw(s *service.GroupService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		groupID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+			return
+		}
+
+		// Get words from the group
+		words, err := s.GetWordsRaw(uint(groupID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch group words"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"items": words,
+		})
+	}
+}
+
 func CreateGroup(s *service.GroupService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var group models.Group

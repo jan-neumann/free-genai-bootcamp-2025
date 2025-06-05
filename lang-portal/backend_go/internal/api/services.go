@@ -54,6 +54,7 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 			groups.DELETE("/:id/words/:word_id", RemoveWordFromGroup(services.Group))
 			groups.GET("/:id/stats", GetGroupStudyStats(services.Group))
 			groups.GET("/:id/words", GetWordsByGroup(services.Word))
+			groups.GET("/:id/raw", GetGroupWordsRaw(services.Group))
 		}
 
 		// Study routes

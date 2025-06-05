@@ -78,6 +78,14 @@ func (m *mockWordRepository) GetByJapanese(japanese string) (*models.Word, error
 	return args.Get(0).(*models.Word), args.Error(1)
 }
 
+func (m *mockWordRepository) GetWordsByGroupRaw(groupID uint) ([]models.Word, error) {
+	args := m.Called(groupID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Word), args.Error(1)
+}
+
 func TestWordService_GetWord(t *testing.T) {
 	mockRepo := new(mockWordRepository)
 	baseService := NewBaseService(mockRepo, nil, nil) // Other repos are nil as they are not used by WordService's GetWord

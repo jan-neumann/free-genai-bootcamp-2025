@@ -275,12 +275,19 @@ func (h *GroupHandler) AddWordToGroup(c *gin.Context) {
 	}
 
 	// Check if word is already in group
-	if err := tx.Model(&group).Association("Words").Find(&word).Error; err != nil {
+	var count int64
+	err = tx.Model(&group).
+		Joins("JOIN word_groups ON word_groups.word_id = words.id").
+		Where("word_groups.group_id = ? AND words.id = ?", groupID, word.ID).
+		Count(&count).Error
+
+	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check word-group association"})
 		return
 	}
-	if word.ID != 0 {
+
+	if count > 0 {
 		tx.Rollback()
 		c.JSON(http.StatusConflict, gin.H{"error": "Word is already in this group"})
 		return

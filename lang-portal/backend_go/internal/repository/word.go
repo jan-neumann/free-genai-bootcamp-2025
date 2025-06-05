@@ -147,6 +147,24 @@ func (r *WordRepository) GetWordsByGroup(groupID uint, params PaginationParams) 
 	}, nil
 }
 
+// GetWordsByGroupRaw retrieves a simplified list of words in a group (id, japanese, romaji, english only)
+func (r *WordRepository) GetWordsByGroupRaw(groupID uint) ([]models.Word, error) {
+	var words []models.Word
+	
+	err := r.db.Model(&models.Word{}).
+		Select("words.id, words.japanese, words.romaji, words.english").
+		Joins("JOIN word_groups ON word_groups.word_id = words.id").
+		Where("word_groups.group_id = ?", groupID).
+		Order("words.japanese ASC").
+		Find(&words).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return words, nil
+}
+
 // GetTotalWordCount returns the total number of words
 func (r *WordRepository) GetTotalWordCount() (int64, error) {
 	var count int64
@@ -157,9 +175,11 @@ func (r *WordRepository) GetTotalWordCount() (int64, error) {
 // GetStudiedWordCount returns the number of words that have been studied
 func (r *WordRepository) GetStudiedWordCount() (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Word{}).
-		Joins("JOIN word_review_items ON word_review_items.word_id = words.id").
-		Distinct().
-		Count(&count).Error
-	return count, err
+	if err := r.db.Model(&models.Word{}).
+		Joins("JOIN word_reviews ON word_reviews.word_id = words.id").
+		Distinct("words.id").
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
