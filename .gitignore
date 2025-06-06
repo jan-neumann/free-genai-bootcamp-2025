@@ -1,1 +1,36 @@
-writing-practice/.env
+# Python
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE specific files
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Local development
+*.local
+
+# Build files
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
