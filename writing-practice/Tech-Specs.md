@@ -3,7 +3,7 @@
 
 ## Initialization Step
 When the app first initializes it needs to the following:
-Fetch from the GET localhost:5000/api/groups/:id/raw, this will return a collection of words in a json structure. It will have japanese words with their english translation. We need to store this collection of words in memory
+Fetch from the GET localhost:8081/api/groups/:id/raw, this will return a collection of words in a json structure. It will have japanese words with their english translation. We need to store this collection of words in memory
 
 ## Page States
 
@@ -51,3 +51,8 @@ The Grading System will do the following:
 - It will use an LLM to produce a literal translation of the transcription
 - It will use another LLM to produce a grade
 - It then return this data to the frontend app
+
+## LLM to use
+- Use Groq API and the deepseek-r1-distill-llama-70b model
+
+

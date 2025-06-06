@@ -1,0 +1,17 @@
+# Core dependencies
+streamlit==1.31.0
+requests==2.31.0
+python-dotenv==1.0.0
+Pillow>=10.0.0
+protobuf==3.20.3  # Specific version to avoid compatibility issues
+
+# Machine Learning and OCR
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+manga-ocr>=0.1.1
+
+# API Integrations
+groq>=0.4.0
+elevenlabs>=0.2.0
+python-multipart==0.0.6
