@@ -228,35 +228,72 @@ def fetch_words() -> List[Word]:
     return []
 
 def generate_sentence(words: List[Word]) -> str:
-    """Generate a practice sentence using the given words."""
+    """
+    Generate a practice sentence using the given words with Groq LLM.
+    Creates a simple Japanese sentence at JLPT N5 level using the first word.
+    """
     log_debug(f"Generating sentence from {len(words)} words")
     
     if not words:
         log_debug("No words provided for sentence generation")
         return "No words available for sentence generation."
     
-    # Log the first few words for debugging
-    sample_words = words[:min(3, len(words))]
-    log_debug(f"Sample words: {[w.japanese for w in sample_words]}")
+    # Get the first word to use in the sentence
+    word = words[0]
+    log_debug(f"Using word for sentence generation: {word.japanese} ({word.english})")
     
-    # Simple implementation: return the first word's English translation
-    sentence = words[0].english
-    log_debug(f"Generated English sentence: {sentence}")
-    
-    # Store the corresponding Japanese for grading
-    st.session_state.expected_japanese = words[0].japanese
-    log_debug(f"Corresponding Japanese: {st.session_state.expected_japanese}")
-    
-    # Ensure we return a string
-    if not isinstance(sentence, str):
-        log_debug(f"Warning: Generated sentence is not a string: {sentence}")
-        try:
-            sentence = str(sentence)
-        except Exception as e:
-            log_debug(f"Error converting sentence to string: {e}")
-            sentence = "Error generating sentence"
-    
-    return sentence
+    try:
+        # Initialize Groq client
+        groq_api_key = os.getenv('GROQ_API_KEY')
+        if not groq_api_key:
+            raise ValueError("GROQ_API_KEY environment variable not set")
+            
+        client = Groq(api_key=groq_api_key)
+        
+        # Create a prompt for the LLM
+        prompt = f"""Generate a simple Japanese sentence using the word: {word.japanese} ({word.english}).
+        
+        Requirements:
+        - Use only JLPT N5 level grammar and vocabulary
+        - Keep the sentence short and simple (5-10 words)
+        - Use the word naturally in the sentence
+        - Only output the Japanese sentence, no translation or explanation
+        - Use hiragana/katakana for words that would normally be written that way
+        - Use kanji for common words that N5 learners should know
+        
+        Example output for '本 (book)': これは私の本です。
+        
+        Sentence:"""
+        
+        # Make the API call
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "You are a helpful Japanese language teacher that creates simple, natural Japanese sentences for beginners."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=100,
+            top_p=1,
+            stop=None,
+        )
+        
+        # Extract the generated sentence
+        if response.choices and len(response.choices) > 0:
+            sentence = response.choices[0].message.content.strip()
+            # Clean up any extra quotes or whitespace
+            sentence = sentence.strip('"\'').strip()
+            log_debug(f"Generated sentence: {sentence}")
+            return sentence
+        else:
+            raise ValueError("No response from Groq API")
+            
+    except Exception as e:
+        log_debug(f"Error generating sentence with Groq: {str(e)}")
+        # Fallback to a simple sentence using the word
+        fallback = f"{word.japanese} は いい です。"  # "[Word] is good."
+        log_debug(f"Using fallback sentence: {fallback}")
+        return fallback
 
 def setup_state():
     """Render the setup state UI."""
@@ -360,8 +397,8 @@ def practice_state():
             st.rerun()
         return
     
-    # Display the English sentence to translate to Japanese
-    st.write("### English Sentence:")
+    # Display the Japanese sentence to practice writing
+    st.write("### Japanese Sentence:")
     st.info(f"{st.session_state.current_sentence}")
     st.write("### Your Task:")
     st.write("Write this sentence in Japanese and upload a photo of your handwriting.")
@@ -399,15 +436,16 @@ def practice_state():
                 if not GROQ_API_KEY:
                     st.warning("Running in limited mode. Set GROQ_API_KEY in .env for full functionality.")
                 
-                # Get the expected Japanese from session state or fallback to first word
-                if 'expected_japanese' not in st.session_state or not st.session_state.expected_japanese:
-                    expected_japanese = st.session_state.words[0].japanese if st.session_state.words else ""
-                    st.session_state.expected_japanese = expected_japanese
+                # Use the full generated sentence as the expected Japanese
+                expected_japanese = st.session_state.current_sentence
+                
+                # Store the expected Japanese for display
+                st.session_state.expected_japanese = expected_japanese
                 
                 # Process the submission with the expected Japanese
                 grading_result = st.session_state.grading_system.process_submission(
                     image, 
-                    st.session_state.expected_japanese  # Use the stored Japanese for comparison
+                    expected_japanese  # Pass the expected Japanese for direct comparison
                 )
                 
                 # Store the result and transition to review state
@@ -466,11 +504,20 @@ def review_state():
     
     result = st.session_state.grading_result
     
-    # Display the original English sentence prominently
-    st.write("### Original English:")
-    st.info(f"{st.session_state.current_sentence}")
+    # Display the original Japanese sentence and its English translation
+    col_jp, col_en = st.columns(2)
     
-    # Show the grade with color coding at the top
+    with col_jp:
+        st.write("### Japanese:")
+        st.info(f"{st.session_state.current_sentence}")
+    
+    # Get the English translation from the grading result if available
+    english_translation = result.get('translation', 'No translation available')
+    with col_en:
+        st.write("### English Translation:")
+        st.info(english_translation)
+    
+    # Show the grade with color coding
     st.write("### Your Score:")
     grade = result.get('grade', 0)
     if isinstance(grade, (int, float)):
