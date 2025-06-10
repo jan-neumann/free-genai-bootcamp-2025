@@ -517,18 +517,65 @@ def review_state():
         st.write("### English Translation:")
         st.info(english_translation)
     
-    # Show the grade with color coding
+    # Show the grade with color coding and emoji
     st.write("### Your Score:")
-    grade = result.get('grade', 0)
-    if isinstance(grade, (int, float)):
-        if grade >= 80:
-            st.success(f"**{grade}/100** - Excellent! 🎉")
-        elif grade >= 60:
-            st.info(f"**{grade}/100** - Good job! 👍")
-        else:
-            st.warning(f"**{grade}/100** - Keep practicing! 💪")
+    grade = result.get('grade', 'F')
+    numeric_grade = result.get('numeric_grade', 0)
+    
+    # Define grade styles and messages
+    grade_styles = {
+        'S': {
+            'emoji': '🏆',
+            'message': 'Superior! Outstanding work!',
+            'color': 'success'
+        },
+        'A': {
+            'emoji': '🎯',
+            'message': 'Excellent! Very well done!',
+            'color': 'success'
+        },
+        'B': {
+            'emoji': '👍',
+            'message': 'Good job! You\'re making great progress!',
+            'color': 'info'
+        },
+        'C': {
+            'emoji': '💡',
+            'message': 'Satisfactory. Keep practicing!',
+            'color': 'info'
+        },
+        'D': {
+            'emoji': '📝',
+            'message': 'Needs improvement. Review and try again!',
+            'color': 'warning'
+        },
+        'E': {
+            'emoji': '🔍',
+            'message': 'Needs work. Pay attention to the feedback below.',
+            'color': 'warning'
+        },
+        'F': {
+            'emoji': '🔄',
+            'message': 'Needs significant improvement. Please review and try again.',
+            'color': 'error'
+        }
+    }
+    
+    # Get the style for the current grade (default to 'F' if invalid)
+    style = grade_styles.get(grade.upper() if isinstance(grade, str) else 'F', grade_styles['F'])
+    
+    # Display the grade with appropriate styling
+    if style['color'] == 'success':
+        st.success(f"**Grade: {grade}** {style['emoji']} - {style['message']}")
+    elif style['color'] == 'info':
+        st.info(f"**Grade: {grade}** {style['emoji']} - {style['message']}")
+    elif style['color'] == 'warning':
+        st.warning(f"**Grade: {grade}** {style['emoji']} - {style['message']}")
     else:
-        st.write(f"**{grade}**")
+        st.error(f"**Grade: {grade}** {style['emoji']} - {style['message']}")
+    
+    # Show the numeric score as secondary information
+    st.caption(f"(Score: {numeric_grade}/100)")
     
     # Display the Japanese comparison
     st.write("---")
@@ -580,18 +627,7 @@ def review_state():
             for i, suggestion in enumerate(suggestions, 1):
                 st.write(f"{i}. {suggestion}")
     
-    # Display the grade with color coding
-    st.write("### Grade:")
-    grade = result.get('grade', 0)
-    if isinstance(grade, (int, float)):
-        if grade >= 80:
-            st.success(f"**{grade}/100** - Excellent!")
-        elif grade >= 60:
-            st.info(f"**{grade}/100** - Good job!")
-        else:
-            st.warning(f"**{grade}/100** - Keep practicing!")
-    else:
-        st.write(f"**{grade}**")
+    # Display the grade with color coding (duplicate section removed)
     
     # Display feedback if available
     explanation = result.get('explanation', '')

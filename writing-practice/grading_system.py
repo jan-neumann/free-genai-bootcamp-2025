@@ -245,6 +245,42 @@ class GradingSystem:
             return 1.0
         return len(set1.intersection(set2)) / len(set1.union(set2))
     
+    def _convert_to_letter_grade(self, score: int) -> str:
+        """Convert a numeric score (0-100) to a letter grade.
+        
+        Grading Scale:
+        S: 90-100 - Excellent (Superior)
+        A: 80-89  - Very Good
+        B: 70-79  - Good
+        C: 60-69  - Satisfactory
+        D: 50-59  - Needs Improvement
+        E: 30-49  - Poor
+        F: 0-29   - Fail
+        
+        Args:
+            score: Numeric score from 0 to 100
+            
+        Returns:
+            str: Letter grade (S, A, B, C, D, E, F)
+        """
+        if not isinstance(score, (int, float)):
+            return "F"
+            
+        if score >= 90:
+            return "S"
+        elif score >= 80:
+            return "A"
+        elif score >= 70:
+            return "B"
+        elif score >= 60:
+            return "C"
+        elif score >= 50:
+            return "D"
+        elif score >= 30:
+            return "E"
+        else:
+            return "F"
+            
     def grade_writing(self, user_japanese: str, expected_japanese: str) -> Dict[str, Any]:
         """
         Grade the user's Japanese writing against the expected Japanese text.
@@ -254,7 +290,7 @@ class GradingSystem:
             expected_japanese: Expected Japanese sentence
                 
         Returns:
-            dict: Dictionary containing grade, feedback, and error information
+            dict: Dictionary containing grade (letter), feedback, and error information
         """
         if not self.groq_client or not self.groq_api_key:
             error_msg = "Grading service not available. No API key or client."
@@ -350,9 +386,14 @@ class GradingSystem:
                 if not all(key in result for key in ["grade", "feedback", "suggestions"]):
                     raise ValueError("Invalid response format from grading service")
                     
+                # Get numeric score and convert to letter grade
+                numeric_grade = int(result.get("grade", 0))
+                letter_grade = self._convert_to_letter_grade(numeric_grade)
+                
                 return {
                     "success": True,
-                    "grade": int(result.get("grade", 0)),
+                    "grade": letter_grade,
+                    "numeric_grade": numeric_grade,  # Keep numeric grade for reference
                     "feedback": result.get("feedback", "No feedback provided").strip(),
                     "suggestions": [s.strip() for s in result.get("suggestions", []) if s.strip()],
                     "ocr_adjusted": result.get('is_ocr_issue', False)
@@ -499,14 +540,16 @@ class GradingSystem:
                 return result
                     
             # Update result with grading information
+            numeric_grade = grade_result.get("numeric_grade", 0)
             result.update({
                 "success": True,
-                "grade": min(100, max(0, int(grade_result.get("grade", 0)))),  # Ensure grade is 0-100
+                "grade": grade_result.get("grade", "F"),  # Letter grade (S, A, B, C, D, E, F)
+                "numeric_grade": min(100, max(0, int(numeric_grade))),  # Ensure numeric grade is 0-100
                 "feedback": grade_result.get("feedback", "No feedback provided").strip(),
                 "suggestions": [s for s in grade_result.get("suggestions", []) if s]
             })
                 
-            logger.info(f"Grading complete. Score: {result['grade']}/100")
+            logger.info(f"Grading complete. Grade: {result['grade']} (Score: {result['numeric_grade']}/100)")
                 
         except Exception as e:
             error_msg = f"Error in grading: {str(e)}"
